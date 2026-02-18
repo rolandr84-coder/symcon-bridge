@@ -436,22 +436,15 @@ class SymconBridge extends IPSModule
 
 public function UiList(): void
 {
-    $root = (int)$this->ReadPropertyIntegerSafe('UiRootID', 0); // fallback
-    $filter = (string)$this->ReadPropertyStringSafe('UiFilter', '');
-    $pageSize = (int)$this->ReadPropertyIntegerSafe('UiPageSize', 50);
-
-    // Da UiRootID/UiFilter/UiPageSize in form.json stehen, aber (noch) keine Modul-Properties sind,
-    // lesen wir sie aus der Form nicht direkt. Daher nutzen wir stabile Defaults:
-    // -> Für komfort: nimm root/filter/pagesize lieber als Properties, wenn du willst.
-    $root = 0;
-    $filter = '';
-    $pageSize = 50;
+    $root = (int)$this->ReadPropertyInteger('UiRootID');
+    $filter = (string)$this->ReadPropertyString('UiFilter');
+    $pageSize = (int)$this->ReadPropertyInteger('UiPageSize');
 
     $json = $this->ListVariables($root, $filter, 1, $pageSize);
     $this->SetValue('LastResult', $json);
     $this->UpdateFormField('LastResultLabel', 'caption', $json);
 }
-
+    
 public function UiShowHook(): void
 {
     $hook = trim($this->ReadPropertyString('WebHookPath'));
