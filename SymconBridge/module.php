@@ -274,6 +274,45 @@ class SymconBridge extends IPSModule
     // Helpers
     // -------------------------
 
+
+private function VarTypeToText(int $t): string
+{
+    switch ($t) {
+        case 0: return 'bool';
+        case 1: return 'int';
+        case 2: return 'float';
+        case 3: return 'string';
+        default: return (string)$t;
+    }
+}
+
+private function ValueToText($v, int $t): string
+{
+    if ($v === null) return 'null';
+
+    if (is_bool($v)) return $v ? 'true' : 'false';
+
+    if (is_float($v)) {
+        // nicht zu lang
+        $s = rtrim(rtrim(number_format($v, 4, '.', ''), '0'), '.');
+        return $s;
+    }
+
+    if (is_int($v)) return (string)$v;
+
+    if (is_string($v)) {
+        $s = $v;
+        if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
+        return $s;
+    }
+
+    // arrays/objects
+    $s = json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($s === false) $s = (string)$v;
+    if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
+    return $s;
+}
+    
   private function WalkTreeCollectVars(int $rootID, array &$out): void
 {
     // Symcon Root ist 0 und ist gültig für IPS_GetChildrenIDs(0)
@@ -308,17 +347,19 @@ class SymconBridge extends IPSModule
 
         $profile = $var['VariableProfile'] ?: $var['VariableCustomProfile'];
 
-        return [
-            'var_id' => $varID,
-            'name' => $obj['ObjectName'],
-            'path' => $this->BuildPath($varID),
-            'type' => (int)$var['VariableType'],
-            'profile' => (string)$profile,
-            'ident' => (string)$obj['ObjectIdent'],
-            'parent_id' => (int)$obj['ParentID'],
-            'instance_id' => (int)$this->FindInstanceIdForObject($varID),
-            'value' => @GetValue($varID)
-        ];
+return [
+    'var_id' => $varID,
+    'name' => $obj['ObjectName'],
+    'path' => $this->BuildPath($varID),
+    'type' => (int)$var['VariableType'],
+    'type_text' => $this->VarTypeToText((int)$var['VariableType']),
+    'profile' => (string)$profile,
+    'ident' => (string)$obj['ObjectIdent'],
+    'parent_id' => (int)$obj['ParentID'],
+    'instance_id' => (int)$this->FindInstanceIdForObject($varID),
+    'value' => $value,
+    'value_text' => $this->ValueToText($value, (int)$var['VariableType'])
+];
     }
 
     private function BuildPath(int $objectID): string
