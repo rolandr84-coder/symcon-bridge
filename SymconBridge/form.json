@@ -69,6 +69,23 @@
       ]
     },
     {
+  "type": "List",
+  "name": "VarList",
+  "caption": "Variablen",
+  "rowCount": 15,
+  "add": false,
+  "delete": false,
+  "sort": { "column": "path", "direction": "ascending" },
+  "columns": [
+    { "label": "ID", "name": "var_id", "width": "90px" },
+    { "label": "Name", "name": "name", "width": "220px" },
+    { "label": "Pfad", "name": "path", "width": "520px" },
+    { "label": "Typ", "name": "type", "width": "60px" },
+    { "label": "Profil", "name": "profile", "width": "140px" },
+    { "label": "Wert", "name": "value", "width": "160px" }
+  ]
+}
+    {
       "type": "Label",
       "caption": "LastResult:"
     },
