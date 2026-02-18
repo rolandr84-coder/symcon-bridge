@@ -22,9 +22,12 @@
       "name": "DebugLog",
       "caption": "DebugLog"
     },
+
     {
-      "type": "HorizontalDivider"
+      "type": "Label",
+      "caption": "-------------------------------- UI --------------------------------"
     },
+
     {
       "type": "NumberSpinner",
       "name": "UiRootID",
