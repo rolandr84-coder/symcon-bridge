@@ -340,27 +340,29 @@ private function ValueToText($v, int $t): string
         $this->WalkTreeCollectVars($cid, $out);
     }
 }
-    private function VarToItem(int $varID): array
-    {
-        $obj = IPS_GetObject($varID);
-        $var = IPS_GetVariable($varID);
+   private function VarToItem(int $varID): array
+{
+    $obj = IPS_GetObject($varID);
+    $var = IPS_GetVariable($varID);
 
-        $profile = $var['VariableProfile'] ?: $var['VariableCustomProfile'];
+    $profile = $var['VariableProfile'] ?: $var['VariableCustomProfile'];
 
-return [
-    'var_id' => $varID,
-    'name' => $obj['ObjectName'],
-    'path' => $this->BuildPath($varID),
-    'type' => (int)$var['VariableType'],
-    'type_text' => $this->VarTypeToText((int)$var['VariableType']),
-    'profile' => (string)$profile,
-    'ident' => (string)$obj['ObjectIdent'],
-    'parent_id' => (int)$obj['ParentID'],
-    'instance_id' => (int)$this->FindInstanceIdForObject($varID),
-    'value' => $value,
-    'value_text' => $this->ValueToText($value, (int)$var['VariableType'])
-];
-    }
+    $value = @GetValue($varID);
+
+    return [
+        'var_id' => $varID,
+        'name' => $obj['ObjectName'],
+        'path' => $this->BuildPath($varID),
+        'type' => (int)$var['VariableType'],
+        'type_text' => $this->VarTypeToText((int)$var['VariableType']),
+        'profile' => (string)$profile,
+        'ident' => (string)$obj['ObjectIdent'],
+        'parent_id' => (int)$obj['ParentID'],
+        'instance_id' => (int)$this->FindInstanceIdForObject($varID),
+        'value' => $value,
+        'value_text' => $this->ValueToText($value, (int)$var['VariableType'])
+    ];
+}
 
     private function BuildPath(int $objectID): string
     {
