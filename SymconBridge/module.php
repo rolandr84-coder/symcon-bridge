@@ -12,6 +12,9 @@ class SymconBridge extends IPSModule
         $this->RegisterPropertyString('AuthToken', '');
         $this->RegisterPropertyBoolean('AllowNoAuth', false);
         $this->RegisterVariableString('LastResult', 'LastResult');
+        $this->RegisterPropertyInteger('UiRootID', 0);
+        $this->RegisterPropertyString('UiFilter', '');
+        $this->RegisterPropertyInteger('UiPageSize', 50);
         // WebHook
         $this->RegisterPropertyString('WebHookPath', 'symconbridge');
 
