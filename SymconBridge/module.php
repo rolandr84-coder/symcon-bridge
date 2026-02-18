@@ -492,12 +492,10 @@ public function UiList(): void
         if (!is_array($items)) $items = [];
     }
 
-    // Tabelle füllen
-    $this->UpdateFormField('VarList', 'values', json_encode($items));
+    // Liste füllen (WICHTIG: als Array, nicht JSON-String)
+    $this->UpdateFormField('VarList', 'values', $items);
 
-    // optional: Debug
-    $this->SetValue('LastResult', $json);
-    $this->UpdateFormField('LastResultLabel', 'caption', 'total=' . (($decoded['result']['total'] ?? 0)) );
+    $this->UpdateFormField('LastResultLabel', 'caption', 'total=' . (($decoded['result']['total'] ?? 0)));
 }
     
 public function UiShowHook(): void
