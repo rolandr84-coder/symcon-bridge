@@ -271,27 +271,33 @@ class SymconBridge extends IPSModule
     // Helpers
     // -------------------------
 
-    private function WalkTreeCollectVars(int $rootID, array &$out): void
-    {
-        if ($rootID <= 0 || !IPS_ObjectExists($rootID)) {
-            return;
-        }
-
-        $children = IPS_GetChildrenIDs($rootID);
-        foreach ($children as $cid) {
-            if (!IPS_ObjectExists($cid)) {
-                continue;
-            }
-            $o = IPS_GetObject($cid);
-            if ($o['ObjectType'] === 2 /* Variable */) {
-                $out[] = $this->VarToItem($cid);
-            }
-
-            // recurse for categories/instances/scripts/links etc.
-            $this->WalkTreeCollectVars($cid, $out);
-        }
+  private function WalkTreeCollectVars(int $rootID, array &$out): void
+{
+    // Symcon Root ist 0 und ist gültig für IPS_GetChildrenIDs(0)
+    if ($rootID < 0) {
+        return;
     }
 
+    // Nur prüfen, wenn es nicht Root ist
+    if ($rootID !== 0 && !IPS_ObjectExists($rootID)) {
+        return;
+    }
+
+    $children = IPS_GetChildrenIDs($rootID);
+    foreach ($children as $cid) {
+        if (!IPS_ObjectExists($cid)) {
+            continue;
+        }
+
+        $o = IPS_GetObject($cid);
+        if ($o['ObjectType'] === 2 /* Variable */) {
+            $out[] = $this->VarToItem($cid);
+        }
+
+        // recurse in jedem Fall
+        $this->WalkTreeCollectVars($cid, $out);
+    }
+}
     private function VarToItem(int $varID): array
     {
         $obj = IPS_GetObject($varID);
