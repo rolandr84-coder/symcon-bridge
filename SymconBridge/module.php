@@ -421,6 +421,58 @@ class SymconBridge extends IPSModule
         ];
     }
 
+    public function UiPing(): void
+{
+    $this->SetValue('LastResult', json_encode([
+        'ok' => true,
+        'result' => ['pong' => true, 'time' => time()]
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+    $this->UpdateFormField('LastResultLabel', 'caption', $this->GetValue('LastResult'));
+}
+
+public function UiList(): void
+{
+    $root = (int)$this->ReadPropertyIntegerSafe('UiRootID', 0); // fallback
+    $filter = (string)$this->ReadPropertyStringSafe('UiFilter', '');
+    $pageSize = (int)$this->ReadPropertyIntegerSafe('UiPageSize', 50);
+
+    // Da UiRootID/UiFilter/UiPageSize in form.json stehen, aber (noch) keine Modul-Properties sind,
+    // lesen wir sie aus der Form nicht direkt. Daher nutzen wir stabile Defaults:
+    // -> Für komfort: nimm root/filter/pagesize lieber als Properties, wenn du willst.
+    $root = 0;
+    $filter = '';
+    $pageSize = 50;
+
+    $json = $this->ListVariables($root, $filter, 1, $pageSize);
+    $this->SetValue('LastResult', $json);
+    $this->UpdateFormField('LastResultLabel', 'caption', $json);
+}
+
+public function UiShowHook(): void
+{
+    $hook = trim($this->ReadPropertyString('WebHookPath'));
+    if ($hook === '') $hook = 'symconbridge';
+
+    $url = '/hook/' . $hook;
+
+    $this->SetValue('LastResult', json_encode([
+        'ok' => true,
+        'result' => ['hook_path' => $url]
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+    $this->UpdateFormField('LastResultLabel', 'caption', $this->GetValue('LastResult'));
+}
+
+// Kleine Safe-Reader (damit nix crasht, falls Keys fehlen)
+private function ReadPropertyIntegerSafe(string $name, int $default): int
+{
+    try { return (int)$this->ReadPropertyInteger($name); } catch (Throwable $t) { return $default; }
+}
+private function ReadPropertyStringSafe(string $name, string $default): string
+{
+    try { return (string)$this->ReadPropertyString($name); } catch (Throwable $t) { return $default; }
+}
     // WebHook registration helper (standard pattern)
     private function RegisterHook(string $Hook): void
     {
