@@ -492,10 +492,24 @@ public function UiList(): void
         if (!is_array($items)) $items = [];
     }
 
-    // Liste füllen (WICHTIG: als Array, nicht JSON-String)
-    $this->UpdateFormField('VarList', 'values', $items);
+    // Nur scalare Felder in die List geben (wichtig!)
+    $rows = [];
+    foreach ($items as $it) {
+        $rows[] = [
+            'var_id'     => (int)($it['var_id'] ?? 0),
+            'name'       => (string)($it['name'] ?? ''),
+            'path'       => (string)($it['path'] ?? ''),
+            'type_text'  => (string)($it['type_text'] ?? ''),
+            'profile'    => (string)($it['profile'] ?? ''),
+            'value_text' => (string)($it['value_text'] ?? '')
+        ];
+    }
 
-    $this->UpdateFormField('LastResultLabel', 'caption', 'total=' . (($decoded['result']['total'] ?? 0)));
+    // Manche Symcon-Versionen wollen hier JSON-String
+    $this->UpdateFormField('VarList', 'values', json_encode($rows, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+    $total = (int)($decoded['result']['total'] ?? 0);
+    $this->UpdateFormField('LastResultLabel', 'caption', 'total=' . $total);
 }
     
 public function UiShowHook(): void
