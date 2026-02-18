@@ -1,0 +1,11 @@
+{
+  "id": "{F4E2D613-6C89-4E6D-9B33-0F83C3C3E7B1}",
+  "name": "SymconBridge",
+  "type": 3,
+  "vendor": "Roland",
+  "aliases": ["Symcon Bridge (Tool Manager)"],
+  "parentRequirements": [],
+  "childRequirements": [],
+  "implemented": [],
+  "prefix": "SCB"
+}
