@@ -23,13 +23,12 @@
       "caption": "DebugLog"
     },
     {
-      "type": "Label",
-      "caption": "UI-Tests (schreiben Ergebnis unten in 'LastResult')"
+      "type": "HorizontalDivider"
     },
     {
       "type": "NumberSpinner",
       "name": "UiRootID",
-      "caption": "RootID für ListVariables (0 = Root)",
+      "caption": "RootID (0 = Root)",
       "minimum": 0,
       "maximum": 999999,
       "value": 0
@@ -37,13 +36,13 @@
     {
       "type": "ValidationTextBox",
       "name": "UiFilter",
-      "caption": "Filter",
+      "caption": "Filter (Name oder Pfad enthält...)",
       "width": "300px"
     },
     {
       "type": "NumberSpinner",
       "name": "UiPageSize",
-      "caption": "PageSize",
+      "caption": "Max Einträge",
       "minimum": 1,
       "maximum": 500,
       "value": 50
@@ -53,41 +52,41 @@
       "items": [
         {
           "type": "Button",
-          "caption": "Ping (local)",
+          "caption": "Ping",
           "onClick": "SCB_UiPing($id);"
         },
         {
           "type": "Button",
-          "caption": "ListVariables (local)",
+          "caption": "Liste laden",
           "onClick": "SCB_UiList($id);"
         },
         {
           "type": "Button",
-          "caption": "Show Hook URL",
+          "caption": "Hook-URL anzeigen",
           "onClick": "SCB_UiShowHook($id);"
         }
       ]
     },
     {
-  "type": "List",
-  "name": "VarList",
-  "caption": "Variablen",
-  "rowCount": 15,
-  "add": false,
-  "delete": false,
-  "sort": { "column": "path", "direction": "ascending" },
-  "columns": [
-    { "label": "ID", "name": "var_id", "width": "90px" },
-    { "label": "Name", "name": "name", "width": "220px" },
-    { "label": "Pfad", "name": "path", "width": "520px" },
-    { "label": "Typ", "name": "type", "width": "60px" },
-    { "label": "Profil", "name": "profile", "width": "140px" },
-    { "label": "Wert", "name": "value", "width": "160px" }
-  ]
-}
+      "type": "List",
+      "name": "VarList",
+      "caption": "Variablen",
+      "rowCount": 15,
+      "add": false,
+      "delete": false,
+      "columns": [
+        { "label": "ID", "name": "var_id", "width": "90px" },
+        { "label": "Name", "name": "name", "width": "220px" },
+        { "label": "Pfad", "name": "path", "width": "520px" },
+        { "label": "Typ", "name": "type_text", "width": "70px" },
+        { "label": "Profil", "name": "profile", "width": "140px" },
+        { "label": "Wert", "name": "value_text", "width": "200px" }
+      ],
+      "values": []
+    },
     {
       "type": "Label",
-      "caption": "LastResult:"
+      "caption": "Status:"
     },
     {
       "type": "Label",
@@ -95,11 +94,5 @@
       "caption": ""
     }
   ],
-  "actions": [
-    {
-      "type": "Label",
-      "name": "LastResultLabel",
-      "caption": ""
-    }
-  ]
+  "actions": []
 }
