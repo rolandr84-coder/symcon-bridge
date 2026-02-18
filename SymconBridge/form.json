@@ -1,0 +1,88 @@
+{
+  "elements": [
+    {
+      "type": "ValidationTextBox",
+      "name": "AuthToken",
+      "caption": "AuthToken (Bearer)",
+      "width": "600px"
+    },
+    {
+      "type": "CheckBox",
+      "name": "AllowNoAuth",
+      "caption": "AllowNoAuth (unsicher, nur LAN-Test!)"
+    },
+    {
+      "type": "ValidationTextBox",
+      "name": "WebHookPath",
+      "caption": "WebHookPath (ohne /hook/)",
+      "width": "300px"
+    },
+    {
+      "type": "CheckBox",
+      "name": "DebugLog",
+      "caption": "DebugLog"
+    },
+    {
+      "type": "Label",
+      "caption": "UI-Tests (schreiben Ergebnis unten in 'LastResult')"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "UiRootID",
+      "caption": "RootID für ListVariables (0 = Root)",
+      "minimum": 0,
+      "maximum": 999999,
+      "value": 0
+    },
+    {
+      "type": "ValidationTextBox",
+      "name": "UiFilter",
+      "caption": "Filter",
+      "width": "300px"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "UiPageSize",
+      "caption": "PageSize",
+      "minimum": 1,
+      "maximum": 500,
+      "value": 50
+    },
+    {
+      "type": "RowLayout",
+      "items": [
+        {
+          "type": "Button",
+          "caption": "Ping (local)",
+          "onClick": "SCB_UiPing($id);"
+        },
+        {
+          "type": "Button",
+          "caption": "ListVariables (local)",
+          "onClick": "SCB_UiList($id);"
+        },
+        {
+          "type": "Button",
+          "caption": "Show Hook URL",
+          "onClick": "SCB_UiShowHook($id);"
+        }
+      ]
+    },
+    {
+      "type": "Label",
+      "caption": "LastResult:"
+    },
+    {
+      "type": "Label",
+      "name": "LastResultLabel",
+      "caption": ""
+    }
+  ],
+  "actions": [
+    {
+      "type": "Label",
+      "name": "LastResultLabel",
+      "caption": ""
+    }
+  ]
+}
