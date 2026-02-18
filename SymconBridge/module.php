@@ -441,8 +441,20 @@ public function UiList(): void
     $pageSize = (int)$this->ReadPropertyInteger('UiPageSize');
 
     $json = $this->ListVariables($root, $filter, 1, $pageSize);
+    $decoded = json_decode($json, true);
+
+    $items = [];
+    if (is_array($decoded) && ($decoded['ok'] ?? false)) {
+        $items = $decoded['result']['items'] ?? [];
+        if (!is_array($items)) $items = [];
+    }
+
+    // Tabelle füllen
+    $this->UpdateFormField('VarList', 'values', json_encode($items));
+
+    // optional: Debug
     $this->SetValue('LastResult', $json);
-    $this->UpdateFormField('LastResultLabel', 'caption', $json);
+    $this->UpdateFormField('LastResultLabel', 'caption', 'total=' . (($decoded['result']['total'] ?? 0)) );
 }
     
 public function UiShowHook(): void
