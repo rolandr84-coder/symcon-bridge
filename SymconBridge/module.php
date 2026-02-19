@@ -14,7 +14,13 @@ class SymconBridge extends IPSModule
 
         // WebHook
         $this->RegisterPropertyString('WebHookPath', 'symconbridge');
+        $this->RegisterPropertyString('DeviceRegistry', '{}');
 
+        // UI state: aktuell ausgewählte Var
+        $this->Registe$this->RegisterPropertyString('DeviceRegistry', '{}');
+
+// UI state: aktuell ausgewählte Var
+        $this->RegisterAttributeInteger('SelectedVarID', 0);rAttributeInteger('SelectedVarID', 0);
         // UI
         $this->RegisterPropertyInteger('UiRootID', 0);
         $this->RegisterPropertyString('UiFilter', '');
@@ -25,6 +31,13 @@ class SymconBridge extends IPSModule
 
         // Debug
         $this->RegisterPropertyBoolean('DebugLog', false);
+        // Registry-Editor Felder (damit wir sie per UpdateFormField setzen können)
+        $this->RegisterPropertyString('RegKind', 'light');
+        $this->RegisterPropertyString('RegFloor', 'EG');
+        $this->RegisterPropertyString('RegRoomSelect', '');
+        $this->RegisterPropertyString('RegRoomFree', '');
+        $this->RegisterPropertyString('RegName', '');
+        $this->RegisterPropertyBoolean('RegEnabled', true);
     }
 
     public function ApplyChanges()
