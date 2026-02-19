@@ -22,12 +22,10 @@
       "name": "DebugLog",
       "caption": "DebugLog"
     },
-
     {
       "type": "Label",
       "caption": "-------------------------------- UI --------------------------------"
     },
-
     {
       "type": "NumberSpinner",
       "name": "UiRootID",
@@ -53,22 +51,20 @@
     {
       "type": "RowLayout",
       "items": [
-        {
-          "type": "Button",
-          "caption": "Ping",
-          "onClick": "SCB_UiPing($id);"
-        },
-        {
-          "type": "Button",
-          "caption": "Liste laden",
-          "onClick": "SCB_UiList($id);"
-        },
-        {
-          "type": "Button",
-          "caption": "Hook-URL anzeigen",
-          "onClick": "SCB_UiShowHook($id);"
-        }
+        { "type": "Button", "caption": "Ping", "onClick": "SCB_UiPing($id);" },
+        { "type": "Button", "caption": "Liste laden", "onClick": "SCB_UiList($id);" },
+        { "type": "Button", "caption": "Hook-URL anzeigen", "onClick": "SCB_UiShowHook($id);" },
+        { "type": "Button", "caption": "Update (git pull)", "onClick": "SCB_UpdateFromGit($id);" }
       ]
+    },
+    {
+      "type": "Label",
+      "caption": "Update-Log:"
+    },
+    {
+      "type": "Label",
+      "name": "UpdateLogLabel",
+      "caption": ""
     },
     {
       "type": "List",
