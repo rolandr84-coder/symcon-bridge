@@ -197,21 +197,39 @@ class SymconBridge extends IPSModule
         $this->UiRefreshRooms();
         $this->UpdateFormField('LastResultLabel', 'caption', 'Gelöscht: ' . $varID);
     }
+public function UiRefreshRooms(): void
+{
+    $reg = $this->LoadRegistry();
 
-    public function UiRefreshRooms(): void
-    {
-        $reg = $this->LoadRegistry();
+    $rooms = [];
+    foreach ($reg as $e) {
+        if (!is_array($e)) continue;
+        $r = trim((string)($e['room'] ?? ''));
+        if ($r !== '') $rooms[$r] = true;
+    }
 
-        $rooms = [];
-        foreach ($reg as $e) {
-            if (!is_array($e)) {
-                continue;
-            }
-            $r = trim((string)($e['room'] ?? ''));
-            if ($r !== '') {
-                $rooms[$r] = true;
-            }
-        }
+    ksort($rooms);
+
+    $opts = [];
+    // ✅ wichtig: leere Option für "" (damit Symcon nicht meckert)
+    $opts[] = ['caption' => '– bitte wählen –', 'value' => ''];
+
+    foreach (array_keys($rooms) as $r) {
+        $opts[] = ['caption' => $r, 'value' => $r];
+    }
+
+    $this->UpdateFormField(
+        'RegRoomSelect',
+        'options',
+        json_encode($opts, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+    );
+
+    // Optional: sicherstellen, dass der aktuelle Wert existiert
+    $cur = (string)$this->ReadPropertyString('RegRoomSelect');
+    if ($cur !== '' && !isset($rooms[$cur])) {
+        $this->UpdateFormField('RegRoomSelect', 'value', '');
+    }
+}
 
         ksort($rooms);
         $opts = [];
