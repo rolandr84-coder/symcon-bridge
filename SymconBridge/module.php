@@ -226,7 +226,8 @@ public function UiRefreshRooms(): void
     // ✅ sicherstellen, dass aktueller Wert existiert
     $cur = (string)$this->ReadPropertyString('RegRoomSelect');
     if ($cur !== '' && !isset($rooms[$cur])) {
-        $this->UpdateFormField('RegRoomSelect', 'value', '');
+        // Immer einen gültigen Wert setzen, damit Symcon nicht meckert
+    $this->UpdateFormField('RegRoomSelect', 'value', (string)$this->ReadPropertyString('RegRoomSelect'));
     }
 }
     public function UpdateFromGit(): void
@@ -633,7 +634,7 @@ public function UiRefreshRooms(): void
         }
     }
 
-    private function ValueToText($v, int $t): string
+    private function ValueToText($v, int $t $this->UpdateFormField('RegRoomSelect', 'value', ''); $this->UpdateFormField('RegRoomSelect', 'value', '');): string
     {
         if ($v === null) return 'null';
         if (is_bool($v)) return $v ? 'true' : 'false';
