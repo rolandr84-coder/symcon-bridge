@@ -1,53 +1,17 @@
 {
   "elements": [
-    {
-      "type": "ValidationTextBox",
-      "name": "AuthToken",
-      "caption": "AuthToken (Bearer)",
-      "width": "600px"
-    },
-    {
-      "type": "CheckBox",
-      "name": "AllowNoAuth",
-      "caption": "AllowNoAuth (unsicher, nur LAN-Test!)"
-    },
-    {
-      "type": "ValidationTextBox",
-      "name": "WebHookPath",
-      "caption": "WebHookPath (ohne /hook/)",
-      "width": "300px"
-    },
-    {
-      "type": "CheckBox",
-      "name": "DebugLog",
-      "caption": "DebugLog"
-    },
-    {
-      "type": "Label",
-      "caption": "-------------------------------- UI --------------------------------"
-    },
-    {
-      "type": "NumberSpinner",
-      "name": "UiRootID",
-      "caption": "RootID (0 = Root)",
-      "minimum": 0,
-      "maximum": 999999,
-      "value": 0
-    },
-    {
-      "type": "ValidationTextBox",
-      "name": "UiFilter",
-      "caption": "Filter (Name oder Pfad enthält...)",
-      "width": "300px"
-    },
-    {
-      "type": "NumberSpinner",
-      "name": "UiPageSize",
-      "caption": "Max Einträge",
-      "minimum": 1,
-      "maximum": 500,
-      "value": 50
-    },
+    { "type": "ValidationTextBox", "name": "AuthToken", "caption": "AuthToken (Bearer)", "width": "600px" },
+    { "type": "CheckBox", "name": "AllowNoAuth", "caption": "AllowNoAuth (unsicher, nur LAN-Test!)" },
+    { "type": "ValidationTextBox", "name": "WebHookPath", "caption": "WebHookPath (ohne /hook/)", "width": "300px" },
+    { "type": "ValidationTextBox", "name": "RepoPath", "caption": "RepoPath (git pull)", "width": "600px" },
+    { "type": "CheckBox", "name": "DebugLog", "caption": "DebugLog" },
+
+    { "type": "Label", "caption": "--------------------------- Variable Browser ---------------------------" },
+
+    { "type": "NumberSpinner", "name": "UiRootID", "caption": "RootID (0 = Root)", "minimum": 0, "maximum": 999999, "value": 0 },
+    { "type": "ValidationTextBox", "name": "UiFilter", "caption": "Filter (Name oder Pfad enthält...)", "width": "300px" },
+    { "type": "NumberSpinner", "name": "UiPageSize", "caption": "Max Einträge", "minimum": 1, "maximum": 500, "value": 50 },
+
     {
       "type": "RowLayout",
       "items": [
@@ -57,22 +21,18 @@
         { "type": "Button", "caption": "Update (git pull)", "onClick": "SCB_UpdateFromGit($id);" }
       ]
     },
-    {
-      "type": "Label",
-      "caption": "Update-Log:"
-    },
-    {
-      "type": "Label",
-      "name": "UpdateLogLabel",
-      "caption": ""
-    },
+
+    { "type": "Label", "caption": "Update-Log:" },
+    { "type": "Label", "name": "UpdateLogLabel", "caption": "" },
+
     {
       "type": "List",
       "name": "VarList",
-      "caption": "Variablen",
-      "rowCount": 15,
+      "caption": "Variablen (Klick auf Zeile zum Zuordnen)",
+      "rowCount": 12,
       "add": false,
       "delete": false,
+      "onClick": "SCB_UiSelectVar($id, $var_id);",
       "columns": [
         { "label": "ID", "name": "var_id", "width": "90px" },
         { "label": "Name", "name": "name", "width": "220px" },
@@ -83,15 +43,56 @@
       ],
       "values": []
     },
+
+    { "type": "Label", "caption": "--------------------------- Geräte-Zuordnung (Registry) ---------------------------" },
+
+    { "type": "Label", "name": "SelectedVarLabel", "caption": "Ausgewählt: -" },
+
     {
-      "type": "Label",
-      "caption": "Status:"
+      "type": "Select",
+      "name": "RegKind",
+      "caption": "Typ",
+      "options": [
+        { "caption": "Licht", "value": "light" },
+        { "caption": "Steckdose", "value": "plug" },
+        { "caption": "Rollladen / Rollo", "value": "cover" },
+        { "caption": "Tor / Garage", "value": "gate" },
+        { "caption": "Szene", "value": "scene" },
+        { "caption": "Sensor", "value": "sensor" },
+        { "caption": "Sonstiges", "value": "other" }
+      ]
     },
+
     {
-      "type": "Label",
-      "name": "LastResultLabel",
-      "caption": ""
-    }
+      "type": "Select",
+      "name": "RegFloor",
+      "caption": "Stockwerk",
+      "options": [
+        { "caption": "Keller", "value": "Keller" },
+        { "caption": "EG", "value": "EG" },
+        { "caption": "OG", "value": "OG" },
+        { "caption": "DG", "value": "DG" },
+        { "caption": "Außen", "value": "Außen" }
+      ]
+    },
+
+    { "type": "Select", "name": "RegRoomSelect", "caption": "Raum (aus Liste)", "options": [] },
+    { "type": "ValidationTextBox", "name": "RegRoomFree", "caption": "Raum (Freitext)", "width": "300px" },
+
+    { "type": "ValidationTextBox", "name": "RegName", "caption": "Anzeigename", "width": "400px" },
+    { "type": "CheckBox", "name": "RegEnabled", "caption": "Enabled (für Tools/KI freigeben)" },
+
+    {
+      "type": "RowLayout",
+      "items": [
+        { "type": "Button", "caption": "Speichern", "onClick": "SCB_UiSaveRegistry($id);" },
+        { "type": "Button", "caption": "Löschen", "onClick": "SCB_UiDeleteRegistry($id);" },
+        { "type": "Button", "caption": "Geräte-Liste neu laden", "onClick": "SCB_UiRefreshRooms($id);" }
+      ]
+    },
+
+    { "type": "Label", "caption": "Status:" },
+    { "type": "Label", "name": "LastResultLabel", "caption": "" }
   ],
   "actions": []
 }
