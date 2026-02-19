@@ -14,13 +14,13 @@ class SymconBridge extends IPSModule
 
         // WebHook
         $this->RegisterPropertyString('WebHookPath', 'symconbridge');
+
+        // Registry (persistente JSON-Map in den Instanz-Properties)
         $this->RegisterPropertyString('DeviceRegistry', '{}');
 
         // UI state: aktuell ausgewählte Var
-        $this->Registe$this->RegisterPropertyString('DeviceRegistry', '{}');
+        $this->RegisterAttributeInteger('SelectedVarID', 0);
 
-// UI state: aktuell ausgewählte Var
-        $this->RegisterAttributeInteger('SelectedVarID', 0);rAttributeInteger('SelectedVarID', 0);
         // UI
         $this->RegisterPropertyInteger('UiRootID', 0);
         $this->RegisterPropertyString('UiFilter', '');
@@ -31,6 +31,7 @@ class SymconBridge extends IPSModule
 
         // Debug
         $this->RegisterPropertyBoolean('DebugLog', false);
+
         // Registry-Editor Felder (damit wir sie per UpdateFormField setzen können)
         $this->RegisterPropertyString('RegKind', 'light');
         $this->RegisterPropertyString('RegFloor', 'EG');
@@ -86,7 +87,6 @@ class SymconBridge extends IPSModule
             }
         }
 
-        // Nur die Spaltenwerte (scalars) für die List
         $rows = [];
         foreach ($items as $it) {
             $rows[] = [
@@ -99,11 +99,127 @@ class SymconBridge extends IPSModule
             ];
         }
 
-        // Manche Symcon-Versionen erwarten JSON-String bei "values"
         $this->UpdateFormField('VarList', 'values', json_encode($rows, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
         $total = (int)($decoded['result']['total'] ?? 0);
         $this->UpdateFormField('LastResultLabel', 'caption', 'total=' . $total);
+    }
+
+    public function UiSelectVar(int $var_id): void
+    {
+        $varID = (int)$var_id;
+        $this->WriteAttributeInteger('SelectedVarID', $varID);
+
+        if ($varID <= 0 || !IPS_ObjectExists($varID)) {
+            $this->UpdateFormField('SelectedVarLabel', 'caption', 'Ausgewählt: -');
+            return;
+        }
+
+        $o = IPS_GetObject($varID);
+        $path = $this->BuildPath($varID);
+        $this->UpdateFormField('SelectedVarLabel', 'caption', 'Ausgewählt: ' . $varID . ' | ' . $o['ObjectName'] . ' | ' . $path);
+
+        // Räume-Optionen aktualisieren
+        $this->UiRefreshRooms();
+
+        // Registry-Eintrag laden (falls vorhanden), sonst Defaults setzen
+        $reg = $this->LoadRegistry();
+        $key = (string)$varID;
+
+        if (isset($reg[$key]) && is_array($reg[$key])) {
+            $e = $reg[$key];
+            $this->UpdateFormField('RegKind', 'value', (string)($e['kind'] ?? 'light'));
+            $this->UpdateFormField('RegFloor', 'value', (string)($e['floor'] ?? 'EG'));
+            $this->UpdateFormField('RegRoomFree', 'value', (string)($e['room'] ?? ''));
+            $this->UpdateFormField('RegName', 'value', (string)($e['name'] ?? $o['ObjectName']));
+            $this->UpdateFormField('RegEnabled', 'value', (bool)($e['enabled'] ?? true));
+        } else {
+            $this->UpdateFormField('RegKind', 'value', 'light');
+            $this->UpdateFormField('RegFloor', 'value', 'EG');
+            $this->UpdateFormField('RegRoomFree', 'value', '');
+            $this->UpdateFormField('RegName', 'value', (string)$o['ObjectName']);
+            $this->UpdateFormField('RegEnabled', 'value', true);
+        }
+
+        $this->UpdateFormField('LastResultLabel', 'caption', 'Var ausgewählt');
+    }
+
+    public function UiSaveRegistry(): void
+    {
+        $varID = (int)$this->ReadAttributeInteger('SelectedVarID');
+        if ($varID <= 0 || !IPS_ObjectExists($varID)) {
+            $this->UpdateFormField('LastResultLabel', 'caption', 'Bitte zuerst eine Variable auswählen.');
+            return;
+        }
+
+        // Werte aus Form holen (Symcon liefert sie als Properties)
+        $kind = (string)$this->ReadPropertyString('RegKind');
+        $floor = (string)$this->ReadPropertyString('RegFloor');
+        $roomSelect = (string)$this->ReadPropertyString('RegRoomSelect');
+        $roomFree = (string)$this->ReadPropertyString('RegRoomFree');
+        $name = (string)$this->ReadPropertyString('RegName');
+        $enabled = (bool)$this->ReadPropertyBoolean('RegEnabled');
+
+        $room = trim($roomFree) !== '' ? trim($roomFree) : trim($roomSelect);
+
+        if ($name === '') {
+            $o = IPS_GetObject($varID);
+            $name = (string)$o['ObjectName'];
+        }
+
+        $reg = $this->LoadRegistry();
+        $reg[(string)$varID] = [
+            'kind' => $kind,
+            'floor' => $floor,
+            'room' => $room,
+            'name' => $name,
+            'enabled' => $enabled
+        ];
+
+        $this->SaveRegistry($reg);
+
+        $this->UiRefreshRooms();
+        $this->UpdateFormField('LastResultLabel', 'caption', 'Gespeichert: ' . $varID);
+    }
+
+    public function UiDeleteRegistry(): void
+    {
+        $varID = (int)$this->ReadAttributeInteger('SelectedVarID');
+        if ($varID <= 0) {
+            $this->UpdateFormField('LastResultLabel', 'caption', 'Nichts ausgewählt.');
+            return;
+        }
+
+        $reg = $this->LoadRegistry();
+        unset($reg[(string)$varID]);
+        $this->SaveRegistry($reg);
+
+        $this->UiRefreshRooms();
+        $this->UpdateFormField('LastResultLabel', 'caption', 'Gelöscht: ' . $varID);
+    }
+
+    public function UiRefreshRooms(): void
+    {
+        $reg = $this->LoadRegistry();
+
+        $rooms = [];
+        foreach ($reg as $e) {
+            if (!is_array($e)) {
+                continue;
+            }
+            $r = trim((string)($e['room'] ?? ''));
+            if ($r !== '') {
+                $rooms[$r] = true;
+            }
+        }
+
+        ksort($rooms);
+        $opts = [];
+        foreach (array_keys($rooms) as $r) {
+            $opts[] = ['caption' => $r, 'value' => $r];
+        }
+
+        $this->UpdateFormField('RegRoomSelect', 'options', json_encode($opts, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 
     public function UpdateFromGit(): void
@@ -123,7 +239,7 @@ class SymconBridge extends IPSModule
 
         if ($out === null) {
             $out = "shell_exec liefert null. Vermutlich deaktiviert oder keine Rechte.\n" .
-                   "Workaround: git pull extern machen (SSH/cron) und hier nur ApplyChanges/ReloadForm nutzen.";
+                "Workaround: git pull extern machen (SSH/cron) und hier nur ApplyChanges/ReloadForm nutzen.";
         }
 
         if (mb_strlen($out) > 1500) {
@@ -132,235 +248,12 @@ class SymconBridge extends IPSModule
 
         $this->UpdateFormField('UpdateLogLabel', 'caption', $out);
 
-        // Ohne Symcon-Neustart: Instanz neu anwenden + UI reloaden
         IPS_ApplyChanges($this->InstanceID);
         $this->ReloadForm();
     }
-public function UiSelectVar(int $var_id): void
-{
-    $varID = (int)$var_id;
-    $this->WriteAttributeInteger('SelectedVarID', $varID);
 
-    if ($varID <= 0 || !IPS_ObjectExists($varID)) {
-        $this->UpdateFormField('SelectedVarLabel', 'caption', 'Ausgewählt: -');
-        return;
-    }
-
-    $o = IPS_GetObject($varID);
-    $path = $this->BuildPath($varID);
-    $this->UpdateFormField('SelectedVarLabel', 'caption', 'Ausgewählt: ' . $varID . ' | ' . $o['ObjectName'] . ' | ' . $path);
-
-    // Räume-Optionen aktualisieren
-    $this->UiRefreshRooms();
-
-    // Registry-Eintrag laden (falls vorhanden), sonst Defaults setzen
-    $reg = $this->LoadRegistry();
-    $key = (string)$varID;
-
-    if (isset($reg[$key]) && is_array($reg[$key])) {
-        $e = $reg[$key];
-        $this->UpdateFormField('RegKind', 'value', (string)($e['kind'] ?? 'light'));
-        $this->UpdateFormField('RegFloor', 'value', (string)($e['floor'] ?? 'EG'));
-        $this->UpdateFormField('RegRoomFree', 'value', (string)($e['room'] ?? ''));
-        $this->UpdateFormField('RegName', 'value', (string)($e['name'] ?? $o['ObjectName']));
-        $this->UpdateFormField('RegEnabled', 'value', (bool)($e['enabled'] ?? true));
-    } else {
-        $this->UpdateFormField('RegKind', 'value', 'light');
-        $this->UpdateFormField('RegFloor', 'value', 'EG');
-        $this->UpdateFormField('RegRoomFree', 'value', '');
-        $this->UpdateFormField('RegName', 'value', (string)$o['ObjectName']);
-        $this->UpdateFormField('RegEnabled', 'value', true);
-    }
-
-    $this->UpdateFormField('LastResultLabel', 'caption', 'Var ausgewählt');
-}
-
-public function UiSaveRegistry(): void
-{
-    $varID = (int)$this->ReadAttributeInteger('SelectedVarID');
-    if ($varID <= 0 || !IPS_ObjectExists($varID)) {
-        $this->UpdateFormField('LastResultLabel', 'caption', 'Bitte zuerst eine Variable auswählen.');
-        return;
-    }
-
-    // Werte aus Form holen (Symcon liefert sie als Properties)
-    $kind = (string)$this->ReadPropertyString('RegKind');
-    $floor = (string)$this->ReadPropertyString('RegFloor');
-    $roomSelect = (string)$this->ReadPropertyString('RegRoomSelect');
-    $roomFree = (string)$this->Rpublic function UiSelectVar(int $var_id): void
-{
-    $varID = (int)$var_id;
-    $this->WriteAttributeInteger('SelectedVarID', $varID);
-
-    if ($varID <= 0 || !IPS_ObjectExists($varID)) {
-        $this->UpdateFormField('SelectedVarLabel', 'caption', 'Ausgewählt: -');
-        return;
-    }
-
-    $o = IPS_GetObject($varID);
-    $path = $this->BuildPath($varID);
-    $this->UpdateFormField('SelectedVarLabel', 'caption', 'Ausgewählt: ' . $varID . ' | ' . $o['ObjectName'] . ' | ' . $path);
-
-    // Räume-Optionen aktualisieren
-    $this->UiRefreshRooms();
-
-    // Registry-Eintrag laden (falls vorhanden), sonst Defaults setzen
-    $reg = $this->LoadRegistry();
-    $key = (string)$varID;
-
-    if (isset($reg[$key]) && is_array($reg[$key])) {
-        $e = $reg[$key];
-        $this->UpdateFormField('RegKind', 'value', (string)($e['kind'] ?? 'light'));
-        $this->UpdateFormField('RegFloor', 'value', (string)($e['floor'] ?? 'EG'));
-        $this->UpdateFormField('RegRoomFree', 'value', (string)($e['room'] ?? ''));
-        $this->UpdateFormField('RegName', 'value', (string)($e['name'] ?? $o['ObjectName']));
-        $this->UpdateFormField('RegEnabled', 'value', (bool)($e['enabled'] ?? true));
-    } else {
-        $this->UpdateFormField('RegKind', 'value', 'light');
-        $this->UpdateFormField('RegFloor', 'value', 'EG');
-        $this->UpdateFormField('RegRoomFree', 'value', '');
-        $this->UpdateFormField('RegName', 'value', (string)$o['ObjectName']);
-        $this->UpdateFormField('RegEnabled', 'value', true);
-    }
-
-    $this->UpdateFormField('LastResultLabel', 'caption', 'Var ausgewählt');
-}
-
-public function UiSaveRegistry(): void
-{
-    $varID = (int)$this->ReadAttributeInteger('SelectedVarID');
-    if ($varID <= 0 || !IPS_ObjectExists($varID)) {
-        $this->UpdateFormField('LastResultLabel', 'caption', 'Bitte zuerst eine Variable auswählen.');
-        return;
-    }
-
-    // Werte aus Form holen (Symcon liefert sie als Properties)
-    $kind = (string)$this->ReadPropertyString('RegKind');
-    $floor = (string)$this->ReadPropertyString('RegFloor');
-    $roomSelect = (string)$this->ReadPropertyString('RegRoomSelect');
-    $roomFree = (string)$this->ReadPropertyString('RegRoomFree');
-    $name = (string)$this->ReadPropertyString('RegName');
-    $enabled = (bool)$this->ReadPropertyBoolean('RegEnabled');
-
-    $room = trim($roomFree) !== '' ? trim($roomFree) : trim($roomSelect);
-
-    if ($name === '') {
-        $o = IPS_GetObject($varID);
-        $name = (string)$o['ObjectName'];
-    }
-
-    $reg = $this->LoadRegistry();
-    $reg[(string)$varID] = [
-        'kind' => $kind,
-        'floor' => $floor,
-        'room' => $room,
-        'name' => $name,
-        'enabled' => $enabled
-    ];
-
-    $this->SaveRegistry($reg);
-
-    $this->UiRefreshRooms();
-    $this->UpdateFormField('LastResultLabel', 'caption', 'Gespeichert: ' . $varID);
-}
-
-public function UiDeleteRegistry(): void
-{
-    $varID = (int)$this->ReadAttributeInteger('SelectedVarID');
-    if ($varID <= 0) {
-        $this->UpdateFormField('LastResultLabel', 'caption', 'Nichts ausgewählt.');
-        return;
-    }
-
-    $reg = $this->LoadRegistry();
-    unset($reg[(string)$varID]);
-    $this->SaveRegistry($reg);
-
-    $this->UiRefreshRooms();
-    $this->UpdateFormField('LastResultLabel', 'caption', 'Gelöscht: ' . $varID);
-}
-
-public function UiRefreshRooms(): void
-{
-    $reg = $this->LoadRegistry();
-
-    $rooms = [];
-    foreach ($reg as $e) {
-        if (!is_array($e)) continue;
-        $r = trim((string)($e['room'] ?? ''));
-        if ($r !== '') $rooms[$r] = true;
-    }
-
-    ksort($rooms);
-    $opts = [];
-    foreach (array_keys($rooms) as $r) {
-        $opts[] = ['caption' => $r, 'value' => $r];
-    }
-
-    $this->UpdateFormField('RegRoomSelect', 'options', json_encode($opts, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-}eadPropertyString('RegRoomFree');
-    $name = (string)$this->ReadPropertyString('RegName');
-    $enabled = (bool)$this->ReadPropertyBoolean('RegEnabled');
-
-    $room = trim($roomFree) !== '' ? trim($roomFree) : trim($roomSelect);
-
-    if ($name === '') {
-        $o = IPS_GetObject($varID);
-        $name = (string)$o['ObjectName'];
-    }
-
-    $reg = $this->LoadRegistry();
-    $reg[(string)$varID] = [
-        'kind' => $kind,
-        'floor' => $floor,
-        'room' => $room,
-        'name' => $name,
-        'enabled' => $enabled
-    ];
-
-    $this->SaveRegistry($reg);
-
-    $this->UiRefreshRooms();
-    $this->UpdateFormField('LastResultLabel', 'caption', 'Gespeichert: ' . $varID);
-}
-
-public function UiDeleteRegistry(): void
-{
-    $varID = (int)$this->ReadAttributeInteger('SelectedVarID');
-    if ($varID <= 0) {
-        $this->UpdateFormField('LastResultLabel', 'caption', 'Nichts ausgewählt.');
-        return;
-    }
-
-    $reg = $this->LoadRegistry();
-    unset($reg[(string)$varID]);
-    $this->SaveRegistry($reg);
-
-    $this->UiRefreshRooms();
-    $this->UpdateFormField('LastResultLabel', 'caption', 'Gelöscht: ' . $varID);
-}
-
-public function UiRefreshRooms(): void
-{
-    $reg = $this->LoadRegistry();
-
-    $rooms = [];
-    foreach ($reg as $e) {
-        if (!is_array($e)) continue;
-        $r = trim((string)($e['room'] ?? ''));
-        if ($r !== '') $rooms[$r] = true;
-    }
-
-    ksort($rooms);
-    $opts = [];
-    foreach (array_keys($rooms) as $r) {
-        $opts[] = ['caption' => $r, 'value' => $r];
-    }
-
-    $this->UpdateFormField('RegRoomSelect', 'options', json_encode($opts, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-}
     // -------------------------
-    // Public functions (Scripts)
+    // Public functions (Scripts / API)
     // -------------------------
 
     public function ListVariables(int $rootID, string $filter = '', int $page = 1, int $pageSize = 200): string
@@ -371,7 +264,6 @@ public function UiRefreshRooms(): void
         $items = [];
         $this->WalkTreeCollectVars($rootID, $items);
 
-        // Filter (case-insensitive substring on path or name)
         $filter = trim($filter);
         if ($filter !== '') {
             $f = mb_strtolower($filter);
@@ -454,20 +346,23 @@ public function UiRefreshRooms(): void
         $ok = false;
         $err = null;
 
-        // Try RequestAction on ident
         $obj = IPS_GetObject($varID);
         $ident = (string)$obj['ObjectIdent'];
+        $iid = (int)$this->FindInstanceIdForObject($varID);
 
-        if ($ident !== '') {
+        // Bevorzugt: IPS_RequestAction(InstanceID, Ident, Value)
+        if ($iid > 0 && $ident !== '') {
             try {
-                $used = 'RequestAction';
-                $ok = @RequestAction($ident, $coerced);
+                $used = 'IPS_RequestAction';
+                IPS_RequestAction($iid, $ident, $coerced);
+                $ok = true;
             } catch (Throwable $t) {
                 $err = $t->getMessage();
                 $ok = false;
             }
         }
 
+        // Fallback: SetValue
         if (!$ok) {
             try {
                 $used = $used ? ($used . ' -> SetValue') : 'SetValue';
@@ -498,67 +393,53 @@ public function UiRefreshRooms(): void
 
         return json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
-public function ListDevices(): string
-{
-    $reg = $this->LoadRegistry();
-    $devices = [];
 
-    foreach ($reg as $varIdStr => $e) {
-        $varID = (int)$varIdStr;
-        if ($varID <= 0 || !IPS_VariableExists($varID)) continue;
-        if (!is_array($e)) continue;
-        if (!(bool)($e['enabled'] ?? true)) continue;
+    public function ListDevices(): string
+    {
+        $reg = $this->LoadRegistry();
+        $devices = [];
 
-        $kind = (string)($e['kind'] ?? 'other');
-        $name = (string)($e['name'] ?? ('Var ' . $varID));
-        $floor = (string)($e['floor'] ?? '');
-        $room = (string)($e['room'] ?? '');
+        foreach ($reg as $varIdStr => $e) {
+            $varID = (int)$varIdStr;
+            if ($varID <= 0 || !IPS_VariableExists($varID)) {
+                continue;
+            }
+            if (!is_array($e)) {
+                continue;
+            }
+            if (!(bool)($e['enabled'] ?? true)) {
+                continue;
+            }
 
-        $var = IPS_GetVariable($varID);
-        $t = (int)$var['VariableType'];
-        $val = @GetValue($varID);
+            $kind = (string)($e['kind'] ?? 'other');
+            $name = (string)($e['name'] ?? ('Var ' . $varID));
+            $floor = (string)($e['floor'] ?? '');
+            $room = (string)($e['room'] ?? '');
 
-        $cap = $this->CapabilitiesFromVar($t, $var);
+            $var = IPS_GetVariable($varID);
+            $t = (int)$var['VariableType'];
+            $val = @GetValue($varID);
 
-        $devices[] = [
-            'id' => 'var:' . $varID,
-            'name' => $name,
-            'kind' => $kind,
-            'location' => ['floor' => $floor, 'room' => $room],
-            'capabilities' => $cap,
-            'state' => $this->StateFromVar($t, $val),
-            'symcon' => [
-                'var_id' => $varID,
-                'type' => $t,
-                'profile' => (string)($var['VariableProfile'] ?: $var['VariableCustomProfile'])
-            ]
-        ];
+            $cap = $this->CapabilitiesFromVar($t, $var);
+
+            $devices[] = [
+                'id' => 'var:' . $varID,
+                'name' => $name,
+                'kind' => $kind,
+                'location' => ['floor' => $floor, 'room' => $room],
+                'capabilities' => $cap,
+                'state' => $this->StateFromVar($t, $val),
+                'symcon' => [
+                    'var_id' => $varID,
+                    'type' => $t,
+                    'profile' => (string)($var['VariableProfile'] ?: $var['VariableCustomProfile'])
+                ]
+            ];
+        }
+
+        return json_encode(['ok' => true, 'devices' => $devices], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
-    return json_encode(['ok' => true, 'devices' => $devices], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-}
-
-private function CapabilitiesFromVar(int $t, array $var): array
-{
-    $profile = (string)($var['VariableProfile'] ?: $var['VariableCustomProfile']);
-
-    // Minimal: bool = on_off, int/float = level (kannst du später verfeinern)
-    if ($t === 0) return ['on_off'];
-
-    // Klassiker: ~Intensity.100 oder ähnliche Profile -> dim
-    if (stripos($profile, 'intensity') !== false) return ['level'];
-
-    // Sonst generisch
-    if ($t === 1 || $t === 2) return ['level'];
-    return ['value'];
-}
-
-private function StateFromVar(int $t, $val): array
-{
-    if ($t === 0) return ['on' => (bool)$val];
-    if ($t === 1 || $t === 2) return ['level' => $val];
-    return ['value' => $val];
-}
     // -------------------------
     // WebHook endpoint
     // -------------------------
@@ -621,6 +502,12 @@ private function StateFromVar(int $t, $val): array
                     return;
                 }
 
+                case 'list_devices': {
+                    $json = $this->ListDevices();
+                    $this->SendHookResponse(200, json_decode($json, true));
+                    return;
+                }
+
                 case 'ping': {
                     $this->SendHookResponse(200, ['ok' => true, 'result' => ['pong' => true, 'time' => time()]]);
                     return;
@@ -639,27 +526,25 @@ private function StateFromVar(int $t, $val): array
     // Helpers
     // -------------------------
 
-private function LoadRegistry(): array
-{
-    $raw = (string)$this->ReadPropertyString('DeviceRegistry');
-    $data = json_decode($raw, true);
-    return is_array($data) ? $data : [];
-}
-
-private function SaveRegistry(array $reg): void
-{
-    // kompakt speichern
-    $raw = json_encode($reg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if ($raw === false) {
-        $raw = '{}';
+    private function LoadRegistry(): array
+    {
+        $raw = (string)$this->ReadPropertyString('DeviceRegistry');
+        $data = json_decode($raw, true);
+        return is_array($data) ? $data : [];
     }
-    IPS_SetProperty($this->InstanceID, 'DeviceRegistry', $raw);
-    IPS_ApplyChanges($this->InstanceID);
-}
-    
+
+    private function SaveRegistry(array $reg): void
+    {
+        $raw = json_encode($reg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($raw === false) {
+            $raw = '{}';
+        }
+        IPS_SetProperty($this->InstanceID, 'DeviceRegistry', $raw);
+        IPS_ApplyChanges($this->InstanceID);
+    }
+
     private function WalkTreeCollectVars(int $rootID, array &$out): void
     {
-        // Root=0 ist gültig
         if ($rootID < 0) {
             return;
         }
@@ -674,7 +559,7 @@ private function SaveRegistry(array $reg): void
             }
 
             $o = IPS_GetObject($cid);
-            if ($o['ObjectType'] === 2 /* Variable */) {
+            if ($o['ObjectType'] === 2) { // Variable
                 $out[] = $this->VarToItem((int)$cid);
             }
 
@@ -722,7 +607,7 @@ private function SaveRegistry(array $reg): void
         $cur = $objectID;
         while ($cur > 0 && IPS_ObjectExists($cur)) {
             $o = IPS_GetObject($cur);
-            if ($o['ObjectType'] === 1) {
+            if ($o['ObjectType'] === 1) { // Instance
                 return $cur;
             }
             $cur = (int)$o['ParentID'];
@@ -786,6 +671,23 @@ private function SaveRegistry(array $reg): void
                 }
                 return (string)$value;
         }
+    }
+
+    private function CapabilitiesFromVar(int $t, array $var): array
+    {
+        $profile = (string)($var['VariableProfile'] ?: $var['VariableCustomProfile']);
+
+        if ($t === 0) return ['on_off'];
+        if (stripos($profile, 'intensity') !== false) return ['level'];
+        if ($t === 1 || $t === 2) return ['level'];
+        return ['value'];
+    }
+
+    private function StateFromVar(int $t, $val): array
+    {
+        if ($t === 0) return ['on' => (bool)$val];
+        if ($t === 1 || $t === 2) return ['level' => $val];
+        return ['value' => $val];
     }
 
     private function IsAuthorized(): bool
