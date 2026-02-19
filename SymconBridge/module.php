@@ -218,28 +218,17 @@ public function UiRefreshRooms(): void
         $opts[] = ['caption' => $r, 'value' => $r];
     }
 
-    $this->UpdateFormField(
-        'RegRoomSelect',
-        'options',
-        json_encode($opts, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
-    );
+    $this->UpdateFormField('RegRoomSelect', 'options', json_encode(
+        $opts,
+        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+    ));
 
-    // Optional: sicherstellen, dass der aktuelle Wert existiert
+    // ✅ sicherstellen, dass aktueller Wert existiert
     $cur = (string)$this->ReadPropertyString('RegRoomSelect');
     if ($cur !== '' && !isset($rooms[$cur])) {
         $this->UpdateFormField('RegRoomSelect', 'value', '');
     }
 }
-
-        ksort($rooms);
-        $opts = [];
-        foreach (array_keys($rooms) as $r) {
-            $opts[] = ['caption' => $r, 'value' => $r];
-        }
-
-        $this->UpdateFormField('RegRoomSelect', 'options', json_encode($opts, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-    }
-
     public function UpdateFromGit(): void
     {
         $repo = trim($this->ReadPropertyString('RepoPath'));
