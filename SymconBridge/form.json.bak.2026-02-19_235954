@@ -76,7 +76,7 @@
       ]
     },
 
-    { "type": "Select", "name": "RegRoomSelect", "caption": "Raum (aus Liste)", "options": [{ "caption": "– bitte wählen –", "value": "" }] },
+    { "type": "Select", "name": "RegRoomSelect", "caption": "Raum (aus Liste)", "options": [] },
     { "type": "ValidationTextBox", "name": "RegRoomFree", "caption": "Raum (Freitext)", "width": "300px" },
 
     { "type": "ValidationTextBox", "name": "RegName", "caption": "Anzeigename", "width": "400px" },
