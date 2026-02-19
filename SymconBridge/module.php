@@ -117,7 +117,11 @@ class SymconBridge extends IPSModule
 
         $o = IPS_GetObject($varID);
         $path = $this->BuildPath($varID);
-        $this->UpdateFormField('SelectedVarLabel', 'caption', 'Ausgewählt: ' . $varID . ' | ' . $o['ObjectName'] . ' | ' . $path);
+        $this->UpdateFormField(
+            'SelectedVarLabel',
+            'caption',
+            'Ausgewählt: ' . $varID . ' | ' . $o['ObjectName'] . ' | ' . $path
+        );
 
         // Räume-Optionen aktualisieren
         $this->UiRefreshRooms();
@@ -126,31 +130,33 @@ class SymconBridge extends IPSModule
         $reg = $this->LoadRegistry();
         $key = (string)$varID;
 
-    if (isset($reg[$key]) && is_array($reg[$key])) {
-    $e = $reg[$key];
+        if (isset($reg[$key]) && is_array($reg[$key])) {
+            $e = $reg[$key];
+            $room = (string)($e['room'] ?? '');
 
-    $room = (string)($e['room'] ?? '');
+            $this->UpdateFormField('RegKind', 'value', (string)($e['kind'] ?? 'light'));
+            $this->UpdateFormField('RegFloor', 'value', (string)($e['floor'] ?? 'EG'));
 
-    $this->UpdateFormField('RegKind', 'value', (string)($e['kind'] ?? 'light'));
-    $this->UpdateFormField('RegFloor', 'value', (string)($e['floor'] ?? 'EG'));
+            // beide Felder synchron halten
+            $this->UpdateFormField('RegRoomFree', 'value', $room);
+            $this->UpdateFormField('RegRoomSelect', 'value', $room);
 
-    // ✅ beide Felder synchron halten
-    $this->UpdateFormField('RegRoomFree', 'value', $room);
-    $this->UpdateFormField('RegRoomSelect', 'value', $room);
+            $this->UpdateFormField('RegName', 'value', (string)($e['name'] ?? $o['ObjectName']));
+            $this->UpdateFormField('RegEnabled', 'value', (bool)($e['enabled'] ?? true));
+        } else {
+            $this->UpdateFormField('RegKind', 'value', 'light');
+            $this->UpdateFormField('RegFloor', 'value', 'EG');
 
-    $this->UpdateFormField('RegName', 'value', (string)($e['name'] ?? $o['ObjectName']));
-    $this->UpdateFormField('RegEnabled', 'value', (bool)($e['enabled'] ?? true));
-} else {
-    $this->UpdateFormField('RegKind', 'value', 'light');
-    $this->UpdateFormField('RegFloor', 'value', 'EG');
+            $this->UpdateFormField('RegRoomFree', 'value', '');
+            $this->UpdateFormField('RegRoomSelect', 'value', '');
 
-    // ✅ beide leeren
-    $this->UpdateFormField('RegRoomFree', 'value', '');
-    $this->UpdateFormField('RegRoomSelect', 'value', '');
+            $this->UpdateFormField('RegName', 'value', (string)$o['ObjectName']);
+            $this->UpdateFormField('RegEnabled', 'value', true);
+        }
 
-    $this->UpdateFormField('RegName', 'value', (string)$o['ObjectName']);
-    $this->UpdateFormField('RegEnabled', 'value', true);
-}
+        $this->UpdateFormField('LastResultLabel', 'caption', 'Var ausgewählt');
+    }
+
     public function UiSaveRegistry(): void
     {
         $varID = (int)$this->ReadAttributeInteger('SelectedVarID');
@@ -176,10 +182,10 @@ class SymconBridge extends IPSModule
 
         $reg = $this->LoadRegistry();
         $reg[(string)$varID] = [
-            'kind' => $kind,
-            'floor' => $floor,
-            'room' => $room,
-            'name' => $name,
+            'kind'    => $kind,
+            'floor'   => $floor,
+            'room'    => $room,
+            'name'    => $name,
             'enabled' => $enabled
         ];
 
@@ -204,65 +210,47 @@ class SymconBridge extends IPSModule
         $this->UiRefreshRooms();
         $this->UpdateFormField('LastResultLabel', 'caption', 'Gelöscht: ' . $varID);
     }
-        
-public function UiRefreshRooms(): void
-{
-    $reg = $this->LoadRegistry();
 
-    $rooms = [];
-    foreach ($reg as $e) {
-        if (!is_array($e)) continue;
-        $r = trim((string)($e['room'] ?? ''));
-        if ($r !== '') $rooms[$r] = true;
+    public function UiRefreshRooms(): void
+    {
+        $reg = $this->LoadRegistry();
+
+        $rooms = [];
+        foreach ($reg as $e) {
+            if (!is_array($e)) {
+                continue;
+            }
+            $r = trim((string)($e['room'] ?? ''));
+            if ($r !== '') {
+                $rooms[$r] = true;
+            }
+        }
+
+        ksort($rooms);
+
+        $opts = [];
+        // leere Option ist Pflicht, sonst meckert Symcon bei "" als aktuellem Wert
+        $opts[] = ['caption' => '– bitte wählen –', 'value' => ''];
+
+        foreach (array_keys($rooms) as $r) {
+            $opts[] = ['caption' => $r, 'value' => $r];
+        }
+
+        // Options setzen
+        $this->UpdateFormField(
+            'RegRoomSelect',
+            'options',
+            json_encode($opts, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+        );
+
+        // danach IMMER value setzen (gültig oder "")
+        $cur = (string)$this->ReadPropertyString('RegRoomSelect');
+        if ($cur !== '' && !isset($rooms[$cur])) {
+            $cur = '';
+        }
+        $this->UpdateFormField('RegRoomSelect', 'value', $cur);
     }
 
-    ksort($rooms);
-
-    $opts = [];
-    // ✅ leere Option ist Pflicht, sonst meckert Symcon bei "" als aktuellem Wert
-    $opts[] = ['caption' => '– bitte wählen –', 'value' => ''];
-
-    foreach (array_keys($rooms) as $r) {
-        $opts[] = ['caption' => $r, 'value' => $r];
-    }private function ValueToText($v, int $t): string
-{
-    if ($v === null) return 'null';
-    if (is_bool($v)) return $v ? 'true' : 'false';
-    if (is_int($v)) return (string)$v;
-
-    if (is_float($v)) {
-        $s = rtrim(rtrim(number_format($v, 4, '.', ''), '0'), '.');
-        return $s;
-    }
-
-    if (is_string($v)) {
-        $s = $v;
-        if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
-        return $s;
-    }
-
-    $s = json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if ($s === false) $s = (string)$v;
-    if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
-    return $s;
-}
-
-    // ✅ Options setzen
-    $this->UpdateFormField(
-        'RegRoomSelect',
-        'options',
-        json_encode($opts, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
-    );
-
-    // ✅ danach IMMER value setzen (gültig oder "")
-    $cur = (string)$this->ReadPropertyString('RegRoomSelect');
-    if ($cur !== '' && !isset($rooms[$cur])) {
-        $cur = '';
-    }
-    $this->UpdateFormField('RegRoomSelect', 'value', $cur);
-}
-
-        
     public function UpdateFromGit(): void
     {
         $repo = trim($this->ReadPropertyString('RepoPath'));
@@ -323,34 +311,13 @@ public function UiRefreshRooms(): void
         $out = [
             'ok' => true,
             'result' => [
-                'root_id' => $rootID,
-                'filter' => $filter,private function ValueToText($v, int $t): string
-{
-    if ($v === null) return 'null';
-    if (is_bool($v)) return $v ? 'true' : 'false';
-    if (is_int($v)) return (string)$v;
-
-    if (is_float($v)) {
-        $s = rtrim(rtrim(number_format($v, 4, '.', ''), '0'), '.');
-        return $s;
-    }
-
-    if (is_string($v)) {
-        $s = $v;
-        if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
-        return $s;
-    }
-
-    $s = json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if ($s === false) $s = (string)$v;
-    if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
-    return $s;
-}
-                'page' => $page,
-                'page_size' => $pageSize,
-                'total' => $total,
+                'root_id'     => $rootID,
+                'filter'      => $filter,
+                'page'        => $page,
+                'page_size'   => $pageSize,
+                'total'       => $total,
                 'total_pages' => $totalPages,
-                'items' => $slice
+                'items'       => $slice
             ]
         ];
 
@@ -375,20 +342,20 @@ public function UiRefreshRooms(): void
         $out = [
             'ok' => true,
             'result' => [
-                'var_id' => $varID,
-                'name' => $obj['ObjectName'],
-                'path' => $this->BuildPath($varID),
-                'type' => (int)$var['VariableType'],
-                'type_text' => $this->VarTypeToText((int)$var['VariableType']),
-                'value' => GetValue($varID),
-                'value_text' => $this->ValueToText(GetValue($varID), (int)$var['VariableType']),
-                'changed' => $var['VariableChanged'],
-                'updated' => $var['VariableUpdated'],
-                'profile' => $profile,
-                'profile_info' => $profileInfo,
-                'ident' => $obj['ObjectIdent'],
-                'parent_id' => $obj['ParentID'],
-                'instance_id' => $this->FindInstanceIdForObject($varID)
+                'var_id'        => $varID,
+                'name'          => $obj['ObjectName'],
+                'path'          => $this->BuildPath($varID),
+                'type'          => (int)$var['VariableType'],
+                'type_text'     => $this->VarTypeToText((int)$var['VariableType']),
+                'value'         => GetValue($varID),
+                'value_text'    => $this->ValueToText(GetValue($varID), (int)$var['VariableType']),
+                'changed'       => $var['VariableChanged'],
+                'updated'       => $var['VariableUpdated'],
+                'profile'       => $profile,
+                'profile_info'  => $profileInfo,
+                'ident'         => $obj['ObjectIdent'],
+                'parent_id'     => $obj['ParentID'],
+                'instance_id'   => $this->FindInstanceIdForObject($varID)
             ]
         ];
 
@@ -439,8 +406,8 @@ public function UiRefreshRooms(): void
         if (!$ok) {
             return $this->JsonErr('Set failed', [
                 'var_id' => $varID,
-                'used' => $used,
-                'error' => $err
+                'used'   => $used,
+                'error'  => $err
             ], 500);
         }
 
@@ -448,8 +415,8 @@ public function UiRefreshRooms(): void
             'ok' => true,
             'result' => [
                 'var_id' => $varID,
-                'used' => $used,
-                'value' => GetValue($varID)
+                'used'   => $used,
+                'value'  => GetValue($varID)
             ]
         ];
 
@@ -473,28 +440,28 @@ public function UiRefreshRooms(): void
                 continue;
             }
 
-            $kind = (string)($e['kind'] ?? 'other');
-            $name = (string)($e['name'] ?? ('Var ' . $varID));
+            $kind  = (string)($e['kind'] ?? 'other');
+            $name  = (string)($e['name'] ?? ('Var ' . $varID));
             $floor = (string)($e['floor'] ?? '');
-            $room = (string)($e['room'] ?? '');
+            $room  = (string)($e['room'] ?? '');
 
             $var = IPS_GetVariable($varID);
-            $t = (int)$var['VariableType'];
+            $t   = (int)$var['VariableType'];
             $val = @GetValue($varID);
 
             $cap = $this->CapabilitiesFromVar($t, $var);
 
             $devices[] = [
-                'id' => 'var:' . $varID,
-                'name' => $name,
-                'kind' => $kind,
-                'location' => ['floor' => $floor, 'room' => $room],
+                'id'           => 'var:' . $varID,
+                'name'         => $name,
+                'kind'         => $kind,
+                'location'     => ['floor' => $floor, 'room' => $room],
                 'capabilities' => $cap,
-                'state' => $this->StateFromVar($t, $val),
-                'symcon' => [
-                    'var_id' => $varID,
-                    'type' => $t,
-                    'profile' => (string)($var['VariableProfile'] ?: $var['VariableCustomProfile'])
+                'state'        => $this->StateFromVar($t, $val),
+                'symcon'       => [
+                    'var_id'   => $varID,
+                    'type'     => $t,
+                    'profile'  => (string)($var['VariableProfile'] ?: $var['VariableCustomProfile'])
                 ]
             ];
         }
@@ -638,16 +605,16 @@ public function UiRefreshRooms(): void
         $value = @GetValue($varID);
 
         return [
-            'var_id' => $varID,
-            'name' => (string)$obj['ObjectName'],
-            'path' => $this->BuildPath($varID),
-            'type' => (int)$var['VariableType'],
-            'type_text' => $this->VarTypeToText((int)$var['VariableType']),
-            'profile' => (string)$profile,
-            'ident' => (string)$obj['ObjectIdent'],
-            'parent_id' => (int)$obj['ParentID'],
-            'instance_id' => (int)$this->FindInstanceIdForObject($varID),
-            'value' => $value,
+            'var_id'     => $varID,
+            'name'       => (string)$obj['ObjectName'],
+            'path'       => $this->BuildPath($varID),
+            'type'       => (int)$var['VariableType'],
+            'type_text'  => $this->VarTypeToText((int)$var['VariableType']),
+            'profile'    => (string)$profile,
+            'ident'      => (string)$obj['ObjectIdent'],
+            'parent_id'  => (int)$obj['ParentID'],
+            'instance_id'=> (int)$this->FindInstanceIdForObject($varID),
+            'value'      => $value,
             'value_text' => $this->ValueToText($value, (int)$var['VariableType'])
         ];
     }
@@ -688,28 +655,28 @@ public function UiRefreshRooms(): void
         }
     }
 
-   private function ValueToText($v, int $t): string
-{
-    if ($v === null) return 'null';
-    if (is_bool($v)) return $v ? 'true' : 'false';
-    if (is_int($v)) return (string)$v;
+    private function ValueToText($v, int $t): string
+    {
+        if ($v === null) return 'null';
+        if (is_bool($v)) return $v ? 'true' : 'false';
+        if (is_int($v)) return (string)$v;
 
-    if (is_float($v)) {
-        $s = rtrim(rtrim(number_format($v, 4, '.', ''), '0'), '.');
-        return $s;
-    }
+        if (is_float($v)) {
+            $s = rtrim(rtrim(number_format($v, 4, '.', ''), '0'), '.');
+            return $s;
+        }
 
-    if (is_string($v)) {
-        $s = $v;
+        if (is_string($v)) {
+            $s = $v;
+            if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
+            return $s;
+        }
+
+        $s = json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($s === false) $s = (string)$v;
         if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
         return $s;
     }
-
-    $s = json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if ($s === false) $s = (string)$v;
-    if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
-    return $s;
-}
 
     private function CoerceValueByVarType($value, int $varType)
     {
@@ -799,8 +766,8 @@ public function UiRefreshRooms(): void
             'ok' => false,
             'error' => [
                 'message' => $message,
-                'code' => $code,
-                'data' => $data
+                'code'    => $code,
+                'data'    => $data
             ]
         ];
     }
