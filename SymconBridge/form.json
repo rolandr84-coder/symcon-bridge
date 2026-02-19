@@ -32,7 +32,7 @@
       "rowCount": 12,
       "add": false,
       "delete": false,
-      "onClick": "SCB_UiSelectVar($id, $VarList['var_id']);",
+      "onClick": "SCB_UiSelectVar($id, $var_id);",
       "columns": [
         { "label": "ID", "name": "var_id", "width": "90px" },
         { "label": "Name", "name": "name", "width": "220px" },
