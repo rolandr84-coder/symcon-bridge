@@ -11,14 +11,19 @@ class SymconBridge extends IPSModule
         // Security
         $this->RegisterPropertyString('AuthToken', '');
         $this->RegisterPropertyBoolean('AllowNoAuth', false);
-        $this->RegisterVariableString('LastResult', 'LastResult');
-        $this->RegisterPropertyInteger('UiRootID', 0);
-        $this->RegisterPropertyString('UiFilter', '');
-        $this->RegisterPropertyInteger('UiPageSize', 50);
+
         // WebHook
         $this->RegisterPropertyString('WebHookPath', 'symconbridge');
 
-        // Optional: Debug
+        // UI
+        $this->RegisterPropertyInteger('UiRootID', 0);
+        $this->RegisterPropertyString('UiFilter', '');
+        $this->RegisterPropertyInteger('UiPageSize', 50);
+
+        // Git update
+        $this->RegisterPropertyString('RepoPath', '/var/lib/symcon/modules/symcon-bridge');
+
+        // Debug
         $this->RegisterPropertyBoolean('DebugLog', false);
     }
 
@@ -30,19 +35,99 @@ class SymconBridge extends IPSModule
         if ($hook === '') {
             $hook = 'symconbridge';
         }
-
         $this->RegisterHook('/hook/' . $hook);
+    }
+
+    // -------------------------
+    // UI actions
+    // -------------------------
+
+    public function UiPing(): void
+    {
+        $this->UpdateFormField('LastResultLabel', 'caption', 'pong=' . time());
+    }
+
+    public function UiShowHook(): void
+    {
+        $hook = trim($this->ReadPropertyString('WebHookPath'));
+        if ($hook === '') {
+            $hook = 'symconbridge';
+        }
+        $this->UpdateFormField('LastResultLabel', 'caption', '/hook/' . $hook);
+    }
+
+    public function UiList(): void
+    {
+        $root = (int)$this->ReadPropertyInteger('UiRootID');
+        $filter = (string)$this->ReadPropertyString('UiFilter');
+        $pageSize = (int)$this->ReadPropertyInteger('UiPageSize');
+
+        $json = $this->ListVariables($root, $filter, 1, $pageSize);
+        $decoded = json_decode($json, true);
+
+        $items = [];
+        if (is_array($decoded) && ($decoded['ok'] ?? false)) {
+            $items = $decoded['result']['items'] ?? [];
+            if (!is_array($items)) {
+                $items = [];
+            }
+        }
+
+        // Nur die Spaltenwerte (scalars) für die List
+        $rows = [];
+        foreach ($items as $it) {
+            $rows[] = [
+                'var_id'     => (int)($it['var_id'] ?? 0),
+                'name'       => (string)($it['name'] ?? ''),
+                'path'       => (string)($it['path'] ?? ''),
+                'type_text'  => (string)($it['type_text'] ?? ''),
+                'profile'    => (string)($it['profile'] ?? ''),
+                'value_text' => (string)($it['value_text'] ?? '')
+            ];
+        }
+
+        // Manche Symcon-Versionen erwarten JSON-String bei "values"
+        $this->UpdateFormField('VarList', 'values', json_encode($rows, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+        $total = (int)($decoded['result']['total'] ?? 0);
+        $this->UpdateFormField('LastResultLabel', 'caption', 'total=' . $total);
+    }
+
+    public function UpdateFromGit(): void
+    {
+        $repo = trim($this->ReadPropertyString('RepoPath'));
+        if ($repo === '') {
+            $repo = '/var/lib/symcon/modules/symcon-bridge';
+        }
+
+        if (!is_dir($repo . '/.git')) {
+            $this->UpdateFormField('UpdateLogLabel', 'caption', 'Kein Git-Repo unter: ' . $repo);
+            return;
+        }
+
+        $cmd = 'cd ' . escapeshellarg($repo) . ' && git pull 2>&1';
+        $out = @shell_exec($cmd);
+
+        if ($out === null) {
+            $out = "shell_exec liefert null. Vermutlich deaktiviert oder keine Rechte.\n" .
+                   "Workaround: git pull extern machen (SSH/cron) und hier nur ApplyChanges/ReloadForm nutzen.";
+        }
+
+        if (mb_strlen($out) > 1500) {
+            $out = mb_substr($out, 0, 1497) . '...';
+        }
+
+        $this->UpdateFormField('UpdateLogLabel', 'caption', $out);
+
+        // Ohne Symcon-Neustart: Instanz neu anwenden + UI reloaden
+        IPS_ApplyChanges($this->InstanceID);
+        $this->ReloadForm();
     }
 
     // -------------------------
     // Public functions (Scripts)
     // -------------------------
 
-    /**
-     * List variables with metadata and paging.
-     *
-     * @return string JSON
-     */
     public function ListVariables(int $rootID, string $filter = '', int $page = 1, int $pageSize = 200): string
     {
         $page = max(1, $page);
@@ -56,8 +141,8 @@ class SymconBridge extends IPSModule
         if ($filter !== '') {
             $f = mb_strtolower($filter);
             $items = array_values(array_filter($items, function ($it) use ($f) {
-                return (mb_strpos(mb_strtolower($it['name']), $f) !== false)
-                    || (mb_strpos(mb_strtolower($it['path']), $f) !== false);
+                return (mb_strpos(mb_strtolower((string)$it['name']), $f) !== false)
+                    || (mb_strpos(mb_strtolower((string)$it['path']), $f) !== false);
             }));
         }
 
@@ -83,11 +168,6 @@ class SymconBridge extends IPSModule
         return json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
-    /**
-     * Get value + metadata for a variable.
-     *
-     * @return string JSON
-     */
     public function GetVar(int $varID): string
     {
         if (!IPS_VariableExists($varID)) {
@@ -109,8 +189,10 @@ class SymconBridge extends IPSModule
                 'var_id' => $varID,
                 'name' => $obj['ObjectName'],
                 'path' => $this->BuildPath($varID),
-                'type' => $var['VariableType'],
+                'type' => (int)$var['VariableType'],
+                'type_text' => $this->VarTypeToText((int)$var['VariableType']),
                 'value' => GetValue($varID),
+                'value_text' => $this->ValueToText(GetValue($varID), (int)$var['VariableType']),
                 'changed' => $var['VariableChanged'],
                 'updated' => $var['VariableUpdated'],
                 'profile' => $profile,
@@ -124,11 +206,6 @@ class SymconBridge extends IPSModule
         return json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
-    /**
-     * Set value using RequestAction if possible, with fallback to SetValue.
-     *
-     * @return string JSON
-     */
     public function SetVar(int $varID, $value): string
     {
         if (!IPS_VariableExists($varID)) {
@@ -136,20 +213,17 @@ class SymconBridge extends IPSModule
         }
 
         $var = IPS_GetVariable($varID);
-
-        // Basic type coercion
         $coerced = $this->CoerceValueByVarType($value, (int)$var['VariableType']);
 
         $used = null;
         $ok = false;
         $err = null;
 
-        // Try RequestAction on ident chain
+        // Try RequestAction on ident
         $obj = IPS_GetObject($varID);
-        $ident = $obj['ObjectIdent'];
+        $ident = (string)$obj['ObjectIdent'];
 
         if ($ident !== '') {
-            // RequestAction expects ident (string) and value
             try {
                 $used = 'RequestAction';
                 $ok = @RequestAction($ident, $coerced);
@@ -160,7 +234,6 @@ class SymconBridge extends IPSModule
         }
 
         if (!$ok) {
-            // Fallback: direct SetValue (works for many variables, but not all)
             try {
                 $used = $used ? ($used . ' -> SetValue') : 'SetValue';
                 SetValue($varID, $coerced);
@@ -194,6 +267,7 @@ class SymconBridge extends IPSModule
     // -------------------------
     // WebHook endpoint
     // -------------------------
+
     public function ProcessHookData()
     {
         $raw = file_get_contents('php://input');
@@ -204,7 +278,6 @@ class SymconBridge extends IPSModule
             $this->SendDebug('HookBody', $raw, 0);
         }
 
-        // Auth
         if (!$this->IsAuthorized()) {
             $this->SendHookResponse(401, $this->JsonErrArr('Unauthorized', null, 401));
             return;
@@ -248,10 +321,7 @@ class SymconBridge extends IPSModule
                     $value = $args['value'] ?? null;
                     $json = $this->SetVar($varID, $value);
                     $decoded = json_decode($json, true);
-                    $code = ($decoded['ok'] ?? false) ? 200 : 500;
-                    if (isset($decoded['error']['code'])) {
-                        $code = (int)$decoded['error']['code'];
-                    }
+                    $code = ($decoded['ok'] ?? false) ? 200 : (int)($decoded['error']['code'] ?? 500);
                     $this->SendHookResponse($code, $decoded);
                     return;
                 }
@@ -274,95 +344,53 @@ class SymconBridge extends IPSModule
     // Helpers
     // -------------------------
 
-
-private function VarTypeToText(int $t): string
-{
-    switch ($t) {
-        case 0: return 'bool';
-        case 1: return 'int';
-        case 2: return 'float';
-        case 3: return 'string';
-        default: return (string)$t;
-    }
-}
-
-private function ValueToText($v, int $t): string
-{
-    if ($v === null) return 'null';
-
-    if (is_bool($v)) return $v ? 'true' : 'false';
-
-    if (is_float($v)) {
-        // nicht zu lang
-        $s = rtrim(rtrim(number_format($v, 4, '.', ''), '0'), '.');
-        return $s;
-    }
-
-    if (is_int($v)) return (string)$v;
-
-    if (is_string($v)) {
-        $s = $v;
-        if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
-        return $s;
-    }
-
-    // arrays/objects
-    $s = json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if ($s === false) $s = (string)$v;
-    if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
-    return $s;
-}
-    
-  private function WalkTreeCollectVars(int $rootID, array &$out): void
-{
-    // Symcon Root ist 0 und ist gültig für IPS_GetChildrenIDs(0)
-    if ($rootID < 0) {
-        return;
-    }
-
-    // Nur prüfen, wenn es nicht Root ist
-    if ($rootID !== 0 && !IPS_ObjectExists($rootID)) {
-        return;
-    }
-
-    $children = IPS_GetChildrenIDs($rootID);
-    foreach ($children as $cid) {
-        if (!IPS_ObjectExists($cid)) {
-            continue;
+    private function WalkTreeCollectVars(int $rootID, array &$out): void
+    {
+        // Root=0 ist gültig
+        if ($rootID < 0) {
+            return;
+        }
+        if ($rootID !== 0 && !IPS_ObjectExists($rootID)) {
+            return;
         }
 
-        $o = IPS_GetObject($cid);
-        if ($o['ObjectType'] === 2 /* Variable */) {
-            $out[] = $this->VarToItem($cid);
+        $children = IPS_GetChildrenIDs($rootID);
+        foreach ($children as $cid) {
+            if (!IPS_ObjectExists($cid)) {
+                continue;
+            }
+
+            $o = IPS_GetObject($cid);
+            if ($o['ObjectType'] === 2 /* Variable */) {
+                $out[] = $this->VarToItem((int)$cid);
+            }
+
+            $this->WalkTreeCollectVars((int)$cid, $out);
         }
-
-        // recurse in jedem Fall
-        $this->WalkTreeCollectVars($cid, $out);
     }
-}
-   private function VarToItem(int $varID): array
-{
-    $obj = IPS_GetObject($varID);
-    $var = IPS_GetVariable($varID);
 
-    $profile = $var['VariableProfile'] ?: $var['VariableCustomProfile'];
+    private function VarToItem(int $varID): array
+    {
+        $obj = IPS_GetObject($varID);
+        $var = IPS_GetVariable($varID);
 
-    $value = @GetValue($varID);
+        $profile = $var['VariableProfile'] ?: $var['VariableCustomProfile'];
+        $value = @GetValue($varID);
 
-    return [
-        'var_id' => $varID,
-        'name' => $obj['ObjectName'],
-        'path' => $this->BuildPath($varID),
-        'type' => (int)$var['VariableType'],
-        'type_text' => $this->VarTypeToText((int)$var['VariableType']),
-        'profile' => (string)$profile,
-        'ident' => (string)$obj['ObjectIdent'],
-        'parent_id' => (int)$obj['ParentID'],
-        'instance_id' => (int)$this->FindInstanceIdForObject($varID),
-        'value' => $value,
-        'value_text' => $this->ValueToText($value, (int)$var['VariableType'])
-    ];
-}
+        return [
+            'var_id' => $varID,
+            'name' => (string)$obj['ObjectName'],
+            'path' => $this->BuildPath($varID),
+            'type' => (int)$var['VariableType'],
+            'type_text' => $this->VarTypeToText((int)$var['VariableType']),
+            'profile' => (string)$profile,
+            'ident' => (string)$obj['ObjectIdent'],
+            'parent_id' => (int)$obj['ParentID'],
+            'instance_id' => (int)$this->FindInstanceIdForObject($varID),
+            'value' => $value,
+            'value_text' => $this->ValueToText($value, (int)$var['VariableType'])
+        ];
+    }
 
     private function BuildPath(int $objectID): string
     {
@@ -378,7 +406,6 @@ private function ValueToText($v, int $t): string
 
     private function FindInstanceIdForObject(int $objectID): int
     {
-        // Walk up until we hit an Instance (ObjectType 1)
         $cur = $objectID;
         while ($cur > 0 && IPS_ObjectExists($cur)) {
             $o = IPS_GetObject($cur);
@@ -390,19 +417,55 @@ private function ValueToText($v, int $t): string
         return 0;
     }
 
+    private function VarTypeToText(int $t): string
+    {
+        switch ($t) {
+            case 0: return 'bool';
+            case 1: return 'int';
+            case 2: return 'float';
+            case 3: return 'string';
+            default: return (string)$t;
+        }
+    }
+
+    private function ValueToText($v, int $t): string
+    {
+        if ($v === null) return 'null';
+        if (is_bool($v)) return $v ? 'true' : 'false';
+        if (is_int($v)) return (string)$v;
+
+        if (is_float($v)) {
+            $s = rtrim(rtrim(number_format($v, 4, '.', ''), '0'), '.');
+            return $s;
+        }
+
+        if (is_string($v)) {
+            $s = $v;
+            if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
+            return $s;
+        }
+
+        $s = json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($s === false) $s = (string)$v;
+        if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
+        return $s;
+    }
+
     private function CoerceValueByVarType($value, int $varType)
     {
-        // 0=Boolean, 1=Integer, 2=Float, 3=String per IPS
         switch ($varType) {
             case 0:
                 if (is_bool($value)) return $value;
                 if (is_numeric($value)) return ((int)$value) !== 0;
                 $s = mb_strtolower((string)$value);
-                return in_array($s, ['1','true','yes','on','ein','an'], true);
+                return in_array($s, ['1', 'true', 'yes', 'on', 'ein', 'an'], true);
+
             case 1:
                 return (int)$value;
+
             case 2:
                 return (float)$value;
+
             case 3:
             default:
                 if (is_array($value) || is_object($value)) {
@@ -417,18 +480,16 @@ private function ValueToText($v, int $t): string
         if ($this->ReadPropertyBoolean('AllowNoAuth')) {
             return true;
         }
+
         $need = trim($this->ReadPropertyString('AuthToken'));
         if ($need === '') {
-            // If no token configured, deny by default (safer)
-            return false;
+            return false; // safe default
         }
 
-        // Accept either header or query param
         $hdr = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
         $token = '';
 
         if ($hdr !== '') {
-            // Expect: "Bearer <token>" or raw token
             if (stripos($hdr, 'bearer ') === 0) {
                 $token = trim(substr($hdr, 7));
             } else {
@@ -467,75 +528,6 @@ private function ValueToText($v, int $t): string
         ];
     }
 
-    public function UiPing(): void
-{
-    $this->SetValue('LastResult', json_encode([
-        'ok' => true,
-        'result' => ['pong' => true, 'time' => time()]
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-
-    $this->UpdateFormField('LastResultLabel', 'caption', $this->GetValue('LastResult'));
-}
-
-public function UiList(): void
-{
-    $root = (int)$this->ReadPropertyInteger('UiRootID');
-    $filter = (string)$this->ReadPropertyString('UiFilter');
-    $pageSize = (int)$this->ReadPropertyInteger('UiPageSize');
-
-    $json = $this->ListVariables($root, $filter, 1, $pageSize);
-    $decoded = json_decode($json, true);
-
-    $items = [];
-    if (is_array($decoded) && ($decoded['ok'] ?? false)) {
-        $items = $decoded['result']['items'] ?? [];
-        if (!is_array($items)) $items = [];
-    }
-
-    // Nur scalare Felder in die List geben (wichtig!)
-    $rows = [];
-    foreach ($items as $it) {
-        $rows[] = [
-            'var_id'     => (int)($it['var_id'] ?? 0),
-            'name'       => (string)($it['name'] ?? ''),
-            'path'       => (string)($it['path'] ?? ''),
-            'type_text'  => (string)($it['type_text'] ?? ''),
-            'profile'    => (string)($it['profile'] ?? ''),
-            'value_text' => (string)($it['value_text'] ?? '')
-        ];
-    }
-
-    // Manche Symcon-Versionen wollen hier JSON-String
-    $this->UpdateFormField('VarList', 'values', json_encode($rows, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-
-    $total = (int)($decoded['result']['total'] ?? 0);
-    $this->UpdateFormField('LastResultLabel', 'caption', 'total=' . $total);
-}
-    
-public function UiShowHook(): void
-{
-    $hook = trim($this->ReadPropertyString('WebHookPath'));
-    if ($hook === '') $hook = 'symconbridge';
-
-    $url = '/hook/' . $hook;
-
-    $this->SetValue('LastResult', json_encode([
-        'ok' => true,
-        'result' => ['hook_path' => $url]
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-
-    $this->UpdateFormField('LastResultLabel', 'caption', $this->GetValue('LastResult'));
-}
-
-// Kleine Safe-Reader (damit nix crasht, falls Keys fehlen)
-private function ReadPropertyIntegerSafe(string $name, int $default): int
-{
-    try { return (int)$this->ReadPropertyInteger($name); } catch (Throwable $t) { return $default; }
-}
-private function ReadPropertyStringSafe(string $name, string $default): string
-{
-    try { return (string)$this->ReadPropertyString($name); } catch (Throwable $t) { return $default; }
-}
     // WebHook registration helper (standard pattern)
     private function RegisterHook(string $Hook): void
     {
