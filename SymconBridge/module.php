@@ -126,24 +126,31 @@ class SymconBridge extends IPSModule
         $reg = $this->LoadRegistry();
         $key = (string)$varID;
 
-        if (isset($reg[$key]) && is_array($reg[$key])) {
-            $e = $reg[$key];
-            $this->UpdateFormField('RegKind', 'value', (string)($e['kind'] ?? 'light'));
-            $this->UpdateFormField('RegFloor', 'value', (string)($e['floor'] ?? 'EG'));
-            $this->UpdateFormField('RegRoomFree', 'value', (string)($e['room'] ?? ''));
-            $this->UpdateFormField('RegName', 'value', (string)($e['name'] ?? $o['ObjectName']));
-            $this->UpdateFormField('RegEnabled', 'value', (bool)($e['enabled'] ?? true));
-        } else {
-            $this->UpdateFormField('RegKind', 'value', 'light');
-            $this->UpdateFormField('RegFloor', 'value', 'EG');
-            $this->UpdateFormField('RegRoomFree', 'value', '');
-            $this->UpdateFormField('RegName', 'value', (string)$o['ObjectName']);
-            $this->UpdateFormField('RegEnabled', 'value', true);
-        }
+    if (isset($reg[$key]) && is_array($reg[$key])) {
+    $e = $reg[$key];
 
-        $this->UpdateFormField('LastResultLabel', 'caption', 'Var ausgewählt');
-    }
+    $room = (string)($e['room'] ?? '');
 
+    $this->UpdateFormField('RegKind', 'value', (string)($e['kind'] ?? 'light'));
+    $this->UpdateFormField('RegFloor', 'value', (string)($e['floor'] ?? 'EG'));
+
+    // ✅ beide Felder synchron halten
+    $this->UpdateFormField('RegRoomFree', 'value', $room);
+    $this->UpdateFormField('RegRoomSelect', 'value', $room);
+
+    $this->UpdateFormField('RegName', 'value', (string)($e['name'] ?? $o['ObjectName']));
+    $this->UpdateFormField('RegEnabled', 'value', (bool)($e['enabled'] ?? true));
+} else {
+    $this->UpdateFormField('RegKind', 'value', 'light');
+    $this->UpdateFormField('RegFloor', 'value', 'EG');
+
+    // ✅ beide leeren
+    $this->UpdateFormField('RegRoomFree', 'value', '');
+    $this->UpdateFormField('RegRoomSelect', 'value', '');
+
+    $this->UpdateFormField('RegName', 'value', (string)$o['ObjectName']);
+    $this->UpdateFormField('RegEnabled', 'value', true);
+}
     public function UiSaveRegistry(): void
     {
         $varID = (int)$this->ReadAttributeInteger('SelectedVarID');
@@ -197,6 +204,7 @@ class SymconBridge extends IPSModule
         $this->UiRefreshRooms();
         $this->UpdateFormField('LastResultLabel', 'caption', 'Gelöscht: ' . $varID);
     }
+        
 public function UiRefreshRooms(): void
 {
     $reg = $this->LoadRegistry();
@@ -211,25 +219,50 @@ public function UiRefreshRooms(): void
     ksort($rooms);
 
     $opts = [];
-    // ✅ wichtig: leere Option für "" (damit Symcon nicht meckert)
+    // ✅ leere Option ist Pflicht, sonst meckert Symcon bei "" als aktuellem Wert
     $opts[] = ['caption' => '– bitte wählen –', 'value' => ''];
 
     foreach (array_keys($rooms) as $r) {
         $opts[] = ['caption' => $r, 'value' => $r];
+    }private function ValueToText($v, int $t): string
+{
+    if ($v === null) return 'null';
+    if (is_bool($v)) return $v ? 'true' : 'false';
+    if (is_int($v)) return (string)$v;
+
+    if (is_float($v)) {
+        $s = rtrim(rtrim(number_format($v, 4, '.', ''), '0'), '.');
+        return $s;
     }
 
-    $this->UpdateFormField('RegRoomSelect', 'options', json_encode(
-        $opts,
-        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
-    ));
+    if (is_string($v)) {
+        $s = $v;
+        if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
+        return $s;
+    }
 
-    // ✅ sicherstellen, dass aktueller Wert existiert
+    $s = json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($s === false) $s = (string)$v;
+    if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
+    return $s;
+}
+
+    // ✅ Options setzen
+    $this->UpdateFormField(
+        'RegRoomSelect',
+        'options',
+        json_encode($opts, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+    );
+
+    // ✅ danach IMMER value setzen (gültig oder "")
     $cur = (string)$this->ReadPropertyString('RegRoomSelect');
     if ($cur !== '' && !isset($rooms[$cur])) {
-        // Immer einen gültigen Wert setzen, damit Symcon nicht meckert
-    $this->UpdateFormField('RegRoomSelect', 'value', (string)$this->ReadPropertyString('RegRoomSelect'));
+        $cur = '';
     }
+    $this->UpdateFormField('RegRoomSelect', 'value', $cur);
 }
+
+        
     public function UpdateFromGit(): void
     {
         $repo = trim($this->ReadPropertyString('RepoPath'));
@@ -291,7 +324,28 @@ public function UiRefreshRooms(): void
             'ok' => true,
             'result' => [
                 'root_id' => $rootID,
-                'filter' => $filter,
+                'filter' => $filter,private function ValueToText($v, int $t): string
+{
+    if ($v === null) return 'null';
+    if (is_bool($v)) return $v ? 'true' : 'false';
+    if (is_int($v)) return (string)$v;
+
+    if (is_float($v)) {
+        $s = rtrim(rtrim(number_format($v, 4, '.', ''), '0'), '.');
+        return $s;
+    }
+
+    if (is_string($v)) {
+        $s = $v;
+        if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
+        return $s;
+    }
+
+    $s = json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($s === false) $s = (string)$v;
+    if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
+    return $s;
+}
                 'page' => $page,
                 'page_size' => $pageSize,
                 'total' => $total,
@@ -634,28 +688,28 @@ public function UiRefreshRooms(): void
         }
     }
 
-    private function ValueToText($v, int $t $this->UpdateFormField('RegRoomSelect', 'value', ''); $this->UpdateFormField('RegRoomSelect', 'value', '');): string
-    {
-        if ($v === null) return 'null';
-        if (is_bool($v)) return $v ? 'true' : 'false';
-        if (is_int($v)) return (string)$v;
+   private function ValueToText($v, int $t): string
+{
+    if ($v === null) return 'null';
+    if (is_bool($v)) return $v ? 'true' : 'false';
+    if (is_int($v)) return (string)$v;
 
-        if (is_float($v)) {
-            $s = rtrim(rtrim(number_format($v, 4, '.', ''), '0'), '.');
-            return $s;
-        }
+    if (is_float($v)) {
+        $s = rtrim(rtrim(number_format($v, 4, '.', ''), '0'), '.');
+        return $s;
+    }
 
-        if (is_string($v)) {
-            $s = $v;
-            if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
-            return $s;
-        }
-
-        $s = json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        if ($s === false) $s = (string)$v;
+    if (is_string($v)) {
+        $s = $v;
         if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
         return $s;
     }
+
+    $s = json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($s === false) $s = (string)$v;
+    if (mb_strlen($s) > 80) $s = mb_substr($s, 0, 77) . '...';
+    return $s;
+}
 
     private function CoerceValueByVarType($value, int $varType)
     {
