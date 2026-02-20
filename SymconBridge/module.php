@@ -251,6 +251,72 @@ class SymconBridge extends IPSModule
         $this->UpdateFormField('RegRoomSelect', 'value', $cur);
     }
 
+
+    // -------------------------
+    // UI: Overview (Lichter/Steckdosen)
+    // -------------------------
+
+    public function UiRefreshOverview(): void
+    {
+        $reg = $this->LoadRegistry();
+
+        $lights = [];
+        $plugs  = [];
+
+        foreach ($reg as $varIdStr => $e) {
+            $varID = (int)$varIdStr;
+            if ($varID <= 0 || !IPS_VariableExists($varID)) {
+                continue;
+            }
+            if (!is_array($e)) {
+                continue;
+            }
+
+            $kind = (string)($e["kind"] ?? "other");
+            $name = (string)($e["name"] ?? ("Var " . $varID));
+            $room = (string)($e["room"] ?? "");
+            $enabled = (bool)($e["enabled"] ?? true);
+
+            $obj = IPS_GetObject($varID);
+            $var = IPS_GetVariable($varID);
+            $val = @GetValue($varID);
+
+            $row = [
+                "var_id"     => $varID,
+                "enabled"    => $enabled ? "✓" : "–",
+                "name"       => $name,
+                "room"       => $room,
+                "value_text" => $this->ValueToText($val, (int)$var["VariableType"]),
+                "path"       => $this->BuildPath($varID)
+            ];
+
+            if ($kind === "light") {
+                $lights[] = $row;
+            } elseif ($kind === "plug") {
+                $plugs[] = $row;
+            }
+        }
+
+        // Sortierung: Raum, dann Name
+        $cmp = function($a, $b) {
+            $ar = mb_strtolower((string)($a["room"] ?? ""));
+            $br = mb_strtolower((string)($b["room"] ?? ""));
+            if ($ar === $br) {
+                $an = mb_strtolower((string)($a["name"] ?? ""));
+                $bn = mb_strtolower((string)($b["name"] ?? ""));
+                return $an <=> $bn;
+            }
+            return $ar <=> $br;
+        };
+        usort($lights, $cmp);
+        usort($plugs,  $cmp);
+
+        $this->UpdateFormField("ListLights", "values", json_encode($lights, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $this->UpdateFormField("ListPlugs",  "values", json_encode($plugs,  JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+        $this->UpdateFormField("LastResultLabel", "caption", "Übersicht: Lichter=" . count($lights) . " | Steckdosen=" . count($plugs));
+    }
+
     public function UpdateFromGit(): void
     {
         $repo = trim($this->ReadPropertyString('RepoPath'));
