@@ -28,65 +28,72 @@
     {
       "type": "List",
       "name": "VarList",
-      "caption": "Variablen (Klick auf Zeile zum Zuordnen)",
+      "caption": "Variablen (Klick auf ID zum Zuordnen)",
       "rowCount": 12,
       "add": false,
       "delete": false,
       "columns": [
-        
-{ "label": "ID", "name": "var_id", "width": "90px", "onClick": "SCB_UiSelectVar($id, $VarList['var_id']);" },
-        { "label": "Name", "name": "name", "width": "220px" },
-        { "label": "Pfad", "name": "path", "width": "520px" },
-        { "label": "Typ", "name": "type_text", "width": "70px" },
-        { "label": "Profil", "name": "profile", "width": "140px" },
-        { "label": "Wert", "name": "value_text", "width": "200px" }
+        { "caption": "ID", "name": "var_id", "width": "90px", "onClick": "SCB_UiSelectVar($id, $VarList['var_id']);" },
+        { "caption": "Name", "name": "name", "width": "220px" },
+        { "caption": "Pfad", "name": "path", "width": "520px" },
+        { "caption": "Typ", "name": "type_text", "width": "70px" },
+        { "caption": "Profil", "name": "profile", "width": "140px" },
+        { "caption": "Wert", "name": "value_text", "width": "200px" }
       ],
       "values": []
     },
 
-{ "type": "Label", "caption": "=========================== Geräte-Übersicht ===========================" },
-{
-  "type": "RowLayout",
-  "items": [
-    { "type": "Button", "caption": "Übersicht aktualisieren", "onClick": "SCB_UiRefreshOverview($id);" }
-  ]
-},
+    { "type": "Label", "caption": "=========================== Geräte-Übersicht ===========================" },
 
-{ "type": "Label", "caption": "Lichter" },
-{
-  "type": "List",
-  "name": "ListLights",
-  "rowCount": 8,
-  "add": false,
-  "delete": false,
-  "columns": [
-    { "label": "ID", "name": "var_id", "width": "90px", "onClick": "SCB_UiSelectVar($id, $ListLights['var_id']);" },
-    { "label": "On", "name": "enabled", "width": "55px" },
-    { "label": "Name", "name": "name", "width": "240px" },
-    { "label": "Raum", "name": "room", "width": "140px" },
-    { "label": "Wert", "name": "value_text", "width": "140px" },
-    { "label": "Pfad", "name": "path", "width": "520px" }
-  ],
-  "values": []
-},
+    {
+      "type": "RowLayout",
+      "items": [
+        { "type": "Button", "caption": "Übersicht aktualisieren", "onClick": "SCB_UiRefreshOverview($id);" }
+      ]
+    },
 
-{ "type": "Label", "caption": "Steckdosen" },
-{
-  "type": "List",
-  "name": "ListPlugs",
-  "rowCount": 8,
-  "add": false,
-  "delete": false,
-  "columns": [
-    { "label": "ID", "name": "var_id", "width": "90px", "onClick": "SCB_UiSelectVar($id, $ListPlugs['var_id']);" },
-    { "label": "On", "name": "enabled", "width": "55px" },
-    { "label": "Name", "name": "name", "width": "240px" },
-    { "label": "Raum", "name": "room", "width": "140px" },
-    { "label": "Wert", "name": "value_text", "width": "140px" },
-    { "label": "Pfad", "name": "path", "width": "520px" }
-  ],
-  "values": []
-},
+    { "type": "Label", "caption": "Lichter" },
+    {
+      "type": "List",
+      "name": "ListLights",
+      "rowCount": 10,
+      "add": false,
+      "delete": false,
+      "loadValuesFromConfiguration": false,
+      "onEdit": "SCB_UiOverviewEdit($id, $ListLights);",
+      "columns": [
+        { "caption": "ID", "name": "var_id", "width": "90px", "onClick": "SCB_UiSelectVar($id, $ListLights['var_id']);" },
+        { "caption": "On", "name": "enabled", "width": "55px", "edit": { "type": "CheckBox" } },
+        { "caption": "Name", "name": "name", "width": "240px", "edit": { "type": "ValidationTextBox" } },
+        { "caption": "Stock", "name": "floor", "width": "90px", "edit": { "type": "ValidationTextBox" } },
+        { "caption": "Raum", "name": "room", "width": "160px", "edit": { "type": "ValidationTextBox" } },
+        { "caption": "Wert", "name": "value_text", "width": "140px" },
+        { "caption": "Pfad", "name": "path", "width": "520px" }
+      ],
+      "values": []
+    },
+
+    { "type": "Label", "caption": "Steckdosen" },
+    {
+      "type": "List",
+      "name": "ListPlugs",
+      "rowCount": 10,
+      "add": false,
+      "delete": false,
+      "loadValuesFromConfiguration": false,
+      "onEdit": "SCB_UiOverviewEdit($id, $ListPlugs);",
+      "columns": [
+        { "caption": "ID", "name": "var_id", "width": "90px", "onClick": "SCB_UiSelectVar($id, $ListPlugs['var_id']);" },
+        { "caption": "On", "name": "enabled", "width": "55px", "edit": { "type": "CheckBox" } },
+        { "caption": "Name", "name": "name", "width": "240px", "edit": { "type": "ValidationTextBox" } },
+        { "caption": "Stock", "name": "floor", "width": "90px", "edit": { "type": "ValidationTextBox" } },
+        { "caption": "Raum", "name": "room", "width": "160px", "edit": { "type": "ValidationTextBox" } },
+        { "caption": "Wert", "name": "value_text", "width": "140px" },
+        { "caption": "Pfad", "name": "path", "width": "520px" }
+      ],
+      "values": []
+    },
+
     { "type": "Label", "caption": "--------------------------- Geräte-Zuordnung (Registry) ---------------------------" },
 
     { "type": "Label", "name": "SelectedVarLabel", "caption": "Ausgewählt: -" },

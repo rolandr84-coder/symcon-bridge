@@ -317,6 +317,87 @@ class SymconBridge extends IPSModule
         $this->UpdateFormField("LastResultLabel", "caption", "Übersicht: Lichter=" . count($lights) . " | Steckdosen=" . count($plugs));
     }
 
+    // -------------------------
+    // Overview UI (Gruppiert wie Alexa: Lichter/Steckdosen)
+    // -------------------------
+
+    public function UiRefreshOverview(): void
+    {
+        $reg = $this->LoadRegistry();
+
+        $lights = [];
+        $plugs  = [];
+
+        foreach ($reg as $varIdStr => $e) {
+            $varID = (int)$varIdStr;
+            if ($varID <= 0 || !IPS_VariableExists($varID) || !is_array($e)) {
+                continue;
+            }
+
+            $kind = (string)($e["kind"] ?? "other");
+            $obj  = IPS_GetObject($varID);
+            $var  = IPS_GetVariable($varID);
+
+            $row = [
+                "var_id"     => $varID,
+                "enabled"    => (bool)($e["enabled"] ?? true),
+                "name"       => (string)($e["name"] ?? ($obj["ObjectName"] ?? ("Var " . $varID))),
+                "floor"      => (string)($e["floor"] ?? ""),
+                "room"       => (string)($e["room"] ?? ""),
+                "path"       => $this->BuildPath($varID),
+                "value_text" => $this->ValueToText(GetValue($varID), (int)$var["VariableType"]),
+            ];
+
+            if ($kind === "light") {
+                $lights[] = $row;
+            } elseif ($kind === "plug") {
+                $plugs[] = $row;
+            }
+        }
+
+        usort($lights, function ($a, $b) {
+            return strcmp(($a["room"] . $a["name"]), ($b["room"] . $b["name"]));
+        });
+        usort($plugs, function ($a, $b) {
+            return strcmp(($a["room"] . $a["name"]), ($b["room"] . $b["name"]));
+        });
+
+        $this->UpdateFormField("ListLights", "values", json_encode($lights, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $this->UpdateFormField("ListPlugs",  "values", json_encode($plugs,  JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+        $this->UpdateFormField("LastResultLabel", "caption", "Übersicht: lights=" . count($lights) . " plugs=" . count($plugs));
+    }
+
+    // Erwartet eine Zeile aus der Liste (editierbar) und speichert sie in DeviceRegistry
+    public function UiOverviewEdit(array $row): void
+    {
+        $varID = (int)($row["var_id"] ?? 0);
+        if ($varID <= 0 || !IPS_VariableExists($varID)) {
+            $this->UpdateFormField("LastResultLabel", "caption", "Edit: ungültige var_id");
+            return;
+        }
+
+        $reg = $this->LoadRegistry();
+        $key = (string)$varID;
+        $e = (isset($reg[$key]) && is_array($reg[$key])) ? $reg[$key] : [];
+
+        if (array_key_exists("enabled", $row)) $e["enabled"] = (bool)$row["enabled"];
+        if (array_key_exists("name",    $row)) $e["name"]    = (string)$row["name"];
+        if (array_key_exists("floor",   $row)) $e["floor"]   = (string)$row["floor"];
+        if (array_key_exists("room",    $row)) $e["room"]    = (string)$row["room"];
+
+        if (!isset($e["kind"])) {
+            $e["kind"] = "other";
+        }
+
+        $reg[$key] = $e;
+        $this->SaveRegistry($reg);
+
+        $this->UiRefreshRooms();
+        $this->UiRefreshOverview();
+        $this->UpdateFormField("LastResultLabel", "caption", "Übersicht gespeichert: " . $varID);
+    }
+
     public function UpdateFromGit(): void
     {
         $repo = trim($this->ReadPropertyString('RepoPath'));
