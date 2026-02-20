@@ -321,53 +321,6 @@ class SymconBridge extends IPSModule
     // Overview UI (Gruppiert wie Alexa: Lichter/Steckdosen)
     // -------------------------
 
-    public function UiRefreshOverview(): void
-    {
-        $reg = $this->LoadRegistry();
-
-        $lights = [];
-        $plugs  = [];
-
-        foreach ($reg as $varIdStr => $e) {
-            $varID = (int)$varIdStr;
-            if ($varID <= 0 || !IPS_VariableExists($varID) || !is_array($e)) {
-                continue;
-            }
-
-            $kind = (string)($e["kind"] ?? "other");
-            $obj  = IPS_GetObject($varID);
-            $var  = IPS_GetVariable($varID);
-
-            $row = [
-                "var_id"     => $varID,
-                "enabled"    => (bool)($e["enabled"] ?? true),
-                "name"       => (string)($e["name"] ?? ($obj["ObjectName"] ?? ("Var " . $varID))),
-                "floor"      => (string)($e["floor"] ?? ""),
-                "room"       => (string)($e["room"] ?? ""),
-                "path"       => $this->BuildPath($varID),
-                "value_text" => $this->ValueToText(GetValue($varID), (int)$var["VariableType"]),
-            ];
-
-            if ($kind === "light") {
-                $lights[] = $row;
-            } elseif ($kind === "plug") {
-                $plugs[] = $row;
-            }
-        }
-
-        usort($lights, function ($a, $b) {
-            return strcmp(($a["room"] . $a["name"]), ($b["room"] . $b["name"]));
-        });
-        usort($plugs, function ($a, $b) {
-            return strcmp(($a["room"] . $a["name"]), ($b["room"] . $b["name"]));
-        });
-
-        $this->UpdateFormField("ListLights", "values", json_encode($lights, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-        $this->UpdateFormField("ListPlugs",  "values", json_encode($plugs,  JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-
-        $this->UpdateFormField("LastResultLabel", "caption", "Übersicht: lights=" . count($lights) . " plugs=" . count($plugs));
-    }
-
     // Erwartet eine Zeile aus der Liste (editierbar) und speichert sie in DeviceRegistry
     public function UiOverviewEdit(array $row): void
     {
