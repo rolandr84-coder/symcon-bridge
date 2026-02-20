@@ -44,6 +44,49 @@
       "values": []
     },
 
+{ "type": "Label", "caption": "=========================== Geräte-Übersicht ===========================" },
+{
+  "type": "RowLayout",
+  "items": [
+    { "type": "Button", "caption": "Übersicht aktualisieren", "onClick": "SCB_UiRefreshOverview($id);" }
+  ]
+},
+
+{ "type": "Label", "caption": "Lichter" },
+{
+  "type": "List",
+  "name": "ListLights",
+  "rowCount": 8,
+  "add": false,
+  "delete": false,
+  "columns": [
+    { "label": "ID", "name": "var_id", "width": "90px", "onClick": "SCB_UiSelectVar($id, $ListLights['var_id']);" },
+    { "label": "On", "name": "enabled", "width": "55px" },
+    { "label": "Name", "name": "name", "width": "240px" },
+    { "label": "Raum", "name": "room", "width": "140px" },
+    { "label": "Wert", "name": "value_text", "width": "140px" },
+    { "label": "Pfad", "name": "path", "width": "520px" }
+  ],
+  "values": []
+},
+
+{ "type": "Label", "caption": "Steckdosen" },
+{
+  "type": "List",
+  "name": "ListPlugs",
+  "rowCount": 8,
+  "add": false,
+  "delete": false,
+  "columns": [
+    { "label": "ID", "name": "var_id", "width": "90px", "onClick": "SCB_UiSelectVar($id, $ListPlugs['var_id']);" },
+    { "label": "On", "name": "enabled", "width": "55px" },
+    { "label": "Name", "name": "name", "width": "240px" },
+    { "label": "Raum", "name": "room", "width": "140px" },
+    { "label": "Wert", "name": "value_text", "width": "140px" },
+    { "label": "Pfad", "name": "path", "width": "520px" }
+  ],
+  "values": []
+},
     { "type": "Label", "caption": "--------------------------- Geräte-Zuordnung (Registry) ---------------------------" },
 
     { "type": "Label", "name": "SelectedVarLabel", "caption": "Ausgewählt: -" },
